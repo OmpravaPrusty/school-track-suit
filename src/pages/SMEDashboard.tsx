@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { SMESidebar } from "@/components/SMESidebar";
 import { AdminHeader } from "@/components/AdminHeader";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import SMEDashboardHome from "./sme/SMEDashboardHome";
 import SMESessions from "./sme/SMESessions";
 import SMEStudents from "./sme/SMEStudents";
 import SMENotifications from "./sme/SMENotifications";
