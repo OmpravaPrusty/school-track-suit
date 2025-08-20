@@ -25,7 +25,12 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Settings, LogOut, User, Bell } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
-export function AdminHeader() {
+interface AdminHeaderProps {
+  title?: string;
+  subtitle?: string;
+}
+
+export function AdminHeader({ title = "Educational Management System", subtitle = "Administrator Dashboard" }: AdminHeaderProps) {
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileData, setProfileData] = useState({
@@ -58,8 +63,8 @@ export function AdminHeader() {
         <div className="flex items-center gap-4">
           <SidebarTrigger className="text-foreground hover:bg-accent hover:text-accent-foreground" />
           <div>
-            <h1 className="text-xl font-semibold text-foreground">Educational Management System</h1>
-            <p className="text-sm text-muted-foreground">Administrator Dashboard</p>
+            <h1 className="text-xl font-semibold text-foreground">{title}</h1>
+            <p className="text-sm text-muted-foreground">{subtitle}</p>
           </div>
         </div>
 

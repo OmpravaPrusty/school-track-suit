@@ -1,29 +1,19 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Calendar, BookOpen, Users, Video, Clock, CheckCircle } from "lucide-react";
+import { SMESidebar } from "@/components/SMESidebar";
+import { AdminHeader } from "@/components/AdminHeader";
+import { SidebarProvider } from "@/components/ui/sidebar";
 
 const SMEDashboard = () => {
-  const userEmail = localStorage.getItem("userEmail");
-
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">SME Dashboard</h1>
-            <p className="text-muted-foreground">Welcome back, {userEmail}</p>
-          </div>
-          <Button 
-            variant="outline" 
-            onClick={() => {
-              localStorage.clear();
-              window.location.href = "/";
-            }}
-          >
-            Logout
-          </Button>
-        </div>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full">
+        <SMESidebar />
+        <div className="flex-1 flex flex-col">
+          <AdminHeader title="SME Dashboard" subtitle="Subject Matter Expert Portal" />
+          <main className="flex-1 p-6 bg-background">
+            <div className="max-w-7xl mx-auto space-y-6">
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card>
@@ -154,8 +144,11 @@ const SMEDashboard = () => {
             </CardContent>
           </Card>
         </div>
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 };
 
