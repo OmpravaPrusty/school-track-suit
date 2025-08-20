@@ -22,6 +22,14 @@ const Login = () => {
     student: Users,
   };
 
+  const dummyCredentials = {
+    admin: { email: "admin@school.com", password: "admin123" },
+    school_admin: { email: "schooladmin@school.com", password: "schooladmin123" },
+    teacher: { email: "teacher@school.com", password: "teacher123" },
+    sme: { email: "sme@school.com", password: "sme123" },
+    student: { email: "student@school.com", password: "student123" },
+  };
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -34,15 +42,36 @@ const Login = () => {
       return;
     }
 
-    // Simple authentication logic - in real app, this would be API call
-    if (email === "admin@school.com" && password === "admin123" && role === "admin") {
+    // Check credentials for selected role
+    const roleCredentials = dummyCredentials[role as keyof typeof dummyCredentials];
+    if (email === roleCredentials?.email && password === roleCredentials?.password) {
       localStorage.setItem("userRole", role);
       localStorage.setItem("userEmail", email);
       toast({
         title: "Login Successful",
-        description: "Welcome to the Educational Management System",
+        description: `Welcome ${role.replace('_', ' ').toUpperCase()}`,
       });
-      navigate("/admin");
+      
+      // Navigate based on role
+      switch (role) {
+        case "admin":
+          navigate("/admin");
+          break;
+        case "school_admin":
+          navigate("/school-admin");
+          break;
+        case "teacher":
+          navigate("/teacher");
+          break;
+        case "sme":
+          navigate("/sme");
+          break;
+        case "student":
+          navigate("/student");
+          break;
+        default:
+          navigate("/");
+      }
     } else {
       toast({
         title: "Invalid Credentials",
@@ -121,8 +150,15 @@ const Login = () => {
           </CardFooter>
         </form>
         
-        <div className="px-6 pb-6 text-center text-sm text-muted-foreground">
-          Demo credentials: admin@school.com / admin123
+        <div className="px-6 pb-6 space-y-2 text-center text-xs text-muted-foreground">
+          <p className="font-medium">Demo Credentials:</p>
+          <div className="grid grid-cols-1 gap-1">
+            <p>Admin: admin@school.com / admin123</p>
+            <p>School Admin: schooladmin@school.com / schooladmin123</p>
+            <p>Teacher: teacher@school.com / teacher123</p>
+            <p>SME: sme@school.com / sme123</p>
+            <p>Student: student@school.com / student123</p>
+          </div>
         </div>
       </Card>
     </div>

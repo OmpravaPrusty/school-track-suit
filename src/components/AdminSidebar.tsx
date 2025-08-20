@@ -1,4 +1,4 @@
-import { CalendarCheck, Users, GraduationCap } from "lucide-react";
+import { CalendarCheck, Users, GraduationCap, Layers, BookOpen, School, Building, VideoIcon, FileText } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import {
   Sidebar,
@@ -19,6 +19,16 @@ const navigationItems = [
     icon: CalendarCheck,
   },
   {
+    title: "Batches",
+    url: "/admin/batches",
+    icon: Layers,
+  },
+  {
+    title: "Teachers",
+    url: "/admin/teachers",
+    icon: BookOpen,
+  },
+  {
     title: "SME",
     url: "/admin/sme",
     icon: GraduationCap,
@@ -27,6 +37,26 @@ const navigationItems = [
     title: "Students",
     url: "/admin/students",
     icon: Users,
+  },
+  {
+    title: "Schools",
+    url: "/admin/schools",
+    icon: School,
+  },
+  {
+    title: "Organizations",
+    url: "/admin/organizations",
+    icon: Building,
+  },
+  {
+    title: "Sessions",
+    url: "/admin/sessions",
+    icon: VideoIcon,
+  },
+  {
+    title: "Reports",
+    url: "/admin/reports",
+    icon: FileText,
   },
 ];
 
