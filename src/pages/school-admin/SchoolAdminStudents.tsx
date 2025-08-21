@@ -5,63 +5,87 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Users, Search, Mail, Phone, Edit, Plus, Trash2 } from "lucide-react";
+import { Users, Search, Mail, Phone, Edit, Plus, Trash2, GraduationCap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { SchoolAdminSidebar } from "@/components/SchoolAdminSidebar";
 import { AdminHeader } from "@/components/AdminHeader";
 import { SidebarProvider } from "@/components/ui/sidebar";
 
-const teacherFormSchema = z.object({
+const studentFormSchema = z.object({
   full_name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
-  specialization: z.string().min(2, "Specialization is required"),
+  student_id: z.string().min(1, "Student ID is required"),
+  batch_id: z.string().optional(),
 });
 
-type TeacherFormData = z.infer<typeof teacherFormSchema>;
+type StudentFormData = z.infer<typeof studentFormSchema>;
 
-interface Teacher {
+interface Student {
   id: string;
   full_name: string;
   email: string;
   phone: string;
-  specialization: string;
+  student_id: string;
   status: string;
-  hire_date: string;
-  employee_id: string;
+  enrollment_date: string;
+  batch_name?: string;
+  batch_id?: string;
 }
 
-const SchoolAdminTeachers = () => {
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+interface Batch {
+  id: string;
+  name: string;
+}
+
+const SchoolAdminStudents = () => {
+  const [students, setStudents] = useState<Student[]>([]);
+  const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const { toast } = useToast();
 
-  const form = useForm<TeacherFormData>({
-    resolver: zodResolver(teacherFormSchema),
+  const form = useForm<StudentFormData>({
+    resolver: zodResolver(studentFormSchema),
     defaultValues: {
       full_name: "",
       email: "",
       phone: "",
-      specialization: "",
+      student_id: "",
+      batch_id: "",
     },
   });
 
-  const fetchTeachers = async () => {
+  const fetchBatches = async () => {
     try {
       const { data, error } = await supabase
-        .from('teachers')
+        .from('batches')
+        .select('id, name');
+
+      if (error) throw error;
+      setBatches(data || []);
+    } catch (error) {
+      console.error('Error fetching batches:', error);
+    }
+  };
+
+  const fetchStudents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('students')
         .select(`
           id,
-          employee_id,
-          specialization,
-          hire_date,
+          student_id,
+          enrollment_date,
+          batch_id,
+          batches(name),
           profiles(
             full_name,
             email,
@@ -72,23 +96,24 @@ const SchoolAdminTeachers = () => {
 
       if (error) throw error;
 
-      const teachersData = data.map((teacher: any) => ({
-        id: teacher.id,
-        full_name: teacher.profiles?.full_name || '',
-        email: teacher.profiles?.email || '',
-        phone: teacher.profiles?.phone || '',
-        specialization: teacher.specialization || '',
-        status: teacher.profiles?.status || 'active',
-        hire_date: teacher.hire_date || '',
-        employee_id: teacher.employee_id || '',
+      const studentsData = data.map((student: any) => ({
+        id: student.id,
+        full_name: student.profiles?.full_name || '',
+        email: student.profiles?.email || '',
+        phone: student.profiles?.phone || '',
+        student_id: student.student_id || '',
+        status: student.profiles?.status || 'active',
+        enrollment_date: student.enrollment_date || '',
+        batch_name: student.batches?.name || '',
+        batch_id: student.batch_id || '',
       }));
 
-      setTeachers(teachersData);
+      setStudents(studentsData);
     } catch (error) {
-      console.error('Error fetching teachers:', error);
+      console.error('Error fetching students:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch teachers",
+        description: "Failed to fetch students",
         variant: "destructive",
       });
     } finally {
@@ -97,13 +122,14 @@ const SchoolAdminTeachers = () => {
   };
 
   useEffect(() => {
-    fetchTeachers();
+    fetchBatches();
+    fetchStudents();
   }, []);
 
-  const onSubmit = async (data: TeacherFormData) => {
+  const onSubmit = async (data: StudentFormData) => {
     try {
-      if (editingTeacher) {
-        // Update existing teacher
+      if (editingStudent) {
+        // Update existing student
         const { error: profileError } = await supabase
           .from('profiles')
           .update({
@@ -111,82 +137,85 @@ const SchoolAdminTeachers = () => {
             email: data.email,
             phone: data.phone,
           })
-          .eq('id', editingTeacher.id);
+          .eq('id', editingStudent.id);
 
         if (profileError) throw profileError;
 
-        const { error: teacherError } = await supabase
-          .from('teachers')
+        const { error: studentError } = await supabase
+          .from('students')
           .update({
-            specialization: data.specialization,
+            student_id: data.student_id,
+            batch_id: data.batch_id || null,
           })
-          .eq('id', editingTeacher.id);
+          .eq('id', editingStudent.id);
 
-        if (teacherError) throw teacherError;
+        if (studentError) throw studentError;
 
         toast({
           title: "Success",
-          description: "Teacher updated successfully",
+          description: "Student updated successfully",
         });
       } else {
-        // Create new teacher - this would require auth.users creation first
+        // Create new student - this would require auth.users creation first
         toast({
           title: "Info",
-          description: "Teacher creation requires full authentication setup",
+          description: "Student creation requires full authentication setup",
         });
       }
 
       setIsDialogOpen(false);
-      setEditingTeacher(null);
+      setEditingStudent(null);
       form.reset();
-      fetchTeachers();
+      fetchStudents();
     } catch (error) {
-      console.error('Error saving teacher:', error);
+      console.error('Error saving student:', error);
       toast({
         title: "Error",
-        description: "Failed to save teacher",
+        description: "Failed to save student",
         variant: "destructive",
       });
     }
   };
 
-  const handleEdit = (teacher: Teacher) => {
-    setEditingTeacher(teacher);
-    form.setValue("full_name", teacher.full_name);
-    form.setValue("email", teacher.email);
-    form.setValue("phone", teacher.phone);
-    form.setValue("specialization", teacher.specialization);
+  const handleEdit = (student: Student) => {
+    setEditingStudent(student);
+    form.setValue("full_name", student.full_name);
+    form.setValue("email", student.email);
+    form.setValue("phone", student.phone);
+    form.setValue("student_id", student.student_id);
+    form.setValue("batch_id", student.batch_id || "");
     setIsDialogOpen(true);
   };
 
-  const handleDelete = async (teacherId: string) => {
+  const handleDelete = async (studentId: string) => {
     try {
       const { error } = await supabase
-        .from('teachers')
+        .from('students')
         .delete()
-        .eq('id', teacherId);
+        .eq('id', studentId);
 
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: "Teacher deleted successfully",
+        description: "Student deleted successfully",
       });
-      fetchTeachers();
+      fetchStudents();
     } catch (error) {
-      console.error('Error deleting teacher:', error);
+      console.error('Error deleting student:', error);
       toast({
         title: "Error",
-        description: "Failed to delete teacher",
+        description: "Failed to delete student",
         variant: "destructive",
       });
     }
   };
 
-  const filteredTeachers = teachers.filter((teacher) =>
-    teacher.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    teacher.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    teacher.specialization.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredStudents = students.filter((student) =>
+    student.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.student_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (student.batch_name && student.batch_name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   if (loading) {
@@ -195,10 +224,10 @@ const SchoolAdminTeachers = () => {
         <div className="min-h-screen flex w-full">
           <SchoolAdminSidebar />
           <div className="flex-1 flex flex-col">
-            <AdminHeader title="Teachers Management" subtitle="Manage your school teachers" />
+            <AdminHeader title="Students Management" subtitle="Manage your school students" />
             <main className="flex-1 p-6 bg-background">
               <div className="flex justify-center items-center h-64">
-                <div className="text-lg">Loading teachers...</div>
+                <div className="text-lg">Loading students...</div>
               </div>
             </main>
           </div>
@@ -212,33 +241,33 @@ const SchoolAdminTeachers = () => {
       <div className="min-h-screen flex w-full">
         <SchoolAdminSidebar />
         <div className="flex-1 flex flex-col">
-          <AdminHeader title="Teachers Management" subtitle="Manage your school teachers" />
+          <AdminHeader title="Students Management" subtitle="Manage your school students" />
           <main className="flex-1 p-6 bg-background">
             <div className="max-w-7xl mx-auto space-y-6">
               <div className="flex justify-between items-center">
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground">Teachers Management</h2>
-                  <p className="text-muted-foreground">Manage teachers in your school</p>
+                  <h2 className="text-2xl font-bold text-foreground">Students Management</h2>
+                  <p className="text-muted-foreground">Manage students in your school</p>
                 </div>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
                     <Button onClick={() => {
-                      setEditingTeacher(null);
+                      setEditingStudent(null);
                       form.reset();
                     }}>
                       <Plus className="h-4 w-4 mr-2" />
-                      Add Teacher
+                      Add Student
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
                       <DialogTitle>
-                        {editingTeacher ? "Edit Teacher" : "Add Teacher"}
+                        {editingStudent ? "Edit Student" : "Add Student"}
                       </DialogTitle>
                       <DialogDescription>
-                        {editingTeacher 
-                          ? "Update teacher information" 
-                          : "Add a new teacher to your school"
+                        {editingStudent 
+                          ? "Update student information" 
+                          : "Add a new student to your school"
                         }
                       </DialogDescription>
                     </DialogHeader>
@@ -285,13 +314,37 @@ const SchoolAdminTeachers = () => {
                         />
                         <FormField
                           control={form.control}
-                          name="specialization"
+                          name="student_id"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Specialization</FormLabel>
+                              <FormLabel>Student ID</FormLabel>
                               <FormControl>
-                                <Input placeholder="Enter specialization" {...field} />
+                                <Input placeholder="Enter student ID" {...field} />
                               </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="batch_id"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Batch</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select a batch" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {batches.map((batch) => (
+                                    <SelectItem key={batch.id} value={batch.id}>
+                                      {batch.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -305,7 +358,7 @@ const SchoolAdminTeachers = () => {
                             Cancel
                           </Button>
                           <Button type="submit">
-                            {editingTeacher ? "Update" : "Add"} Teacher
+                            {editingStudent ? "Update" : "Add"} Student
                           </Button>
                         </div>
                       </form>
@@ -316,12 +369,12 @@ const SchoolAdminTeachers = () => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Teacher List</CardTitle>
-                  <CardDescription>Teachers in your school</CardDescription>
+                  <CardTitle>Student List</CardTitle>
+                  <CardDescription>Students in your school</CardDescription>
                   <div className="flex items-center space-x-2">
                     <Search className="h-4 w-4 text-muted-foreground" />
                     <Input 
-                      placeholder="Search teachers..." 
+                      placeholder="Search students..." 
                       className="max-w-sm"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
@@ -330,51 +383,57 @@ const SchoolAdminTeachers = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {filteredTeachers.length === 0 ? (
+                    {filteredStudents.length === 0 ? (
                       <div className="text-center py-8">
-                        <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                        <p className="text-muted-foreground">No teachers found</p>
+                        <GraduationCap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                        <p className="text-muted-foreground">No students found</p>
                       </div>
                     ) : (
-                      filteredTeachers.map((teacher) => (
-                        <div key={teacher.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      filteredStudents.map((student) => (
+                        <div key={student.id} className="flex items-center justify-between p-4 border rounded-lg">
                           <div className="flex items-center space-x-4">
                             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                               <span className="font-medium text-primary">
-                                {teacher.full_name.charAt(0)}
+                                {student.full_name.charAt(0)}
                               </span>
                             </div>
                             <div>
-                              <h4 className="font-medium">{teacher.full_name}</h4>
+                              <h4 className="font-medium">{student.full_name}</h4>
                               <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                                 <div className="flex items-center space-x-1">
                                   <Mail className="h-3 w-3" />
-                                  <span>{teacher.email}</span>
+                                  <span>{student.email}</span>
                                 </div>
                                 <div className="flex items-center space-x-1">
                                   <Phone className="h-3 w-3" />
-                                  <span>{teacher.phone}</span>
+                                  <span>{student.phone}</span>
                                 </div>
                               </div>
                               <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                                <span>{teacher.specialization}</span>
-                                {teacher.hire_date && (
+                                <span>ID: {student.student_id}</span>
+                                {student.batch_name && (
                                   <>
                                     <span>•</span>
-                                    <span>Hired: {new Date(teacher.hire_date).toLocaleDateString()}</span>
+                                    <span>Batch: {student.batch_name}</span>
+                                  </>
+                                )}
+                                {student.enrollment_date && (
+                                  <>
+                                    <span>•</span>
+                                    <span>Enrolled: {new Date(student.enrollment_date).toLocaleDateString()}</span>
                                   </>
                                 )}
                               </div>
                             </div>
                           </div>
                           <div className="flex items-center space-x-4">
-                            <Badge variant={teacher.status === 'active' ? 'default' : 'secondary'}>
-                              {teacher.status}
+                            <Badge variant={student.status === 'active' ? 'default' : 'secondary'}>
+                              {student.status}
                             </Badge>
                             <Button 
                               size="sm" 
                               variant="outline"
-                              onClick={() => handleEdit(teacher)}
+                              onClick={() => handleEdit(student)}
                             >
                               <Edit className="h-4 w-4 mr-2" />
                               Edit
@@ -382,7 +441,7 @@ const SchoolAdminTeachers = () => {
                             <Button 
                               size="sm" 
                               variant="outline"
-                              onClick={() => handleDelete(teacher.id)}
+                              onClick={() => handleDelete(student.id)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -401,4 +460,4 @@ const SchoolAdminTeachers = () => {
   );
 };
 
-export default SchoolAdminTeachers;
+export default SchoolAdminStudents;
