@@ -22,6 +22,11 @@ import StudentDashboard from "./pages/StudentDashboard";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import SMEDashboard from "./pages/SMEDashboard";
 import SchoolAdminDashboard from "./pages/SchoolAdminDashboard";
+import SchoolAdminTeachers from "./pages/school-admin/SchoolAdminTeachers";
+import SchoolAdminStudents from "./pages/school-admin/SchoolAdminStudents";
+import SchoolAdminUpload from "./pages/school-admin/SchoolAdminUpload";
+import SchoolAdminSessions from "./pages/school-admin/SchoolAdminSessions";
+import SchoolAdminNotifications from "./pages/school-admin/SchoolAdminNotifications";
 
 const queryClient = new QueryClient();
 
@@ -50,7 +55,12 @@ const App = () => (
           <Route path="/student/*" element={<StudentDashboard />} />
           <Route path="/teacher/*" element={<TeacherDashboard />} />
           <Route path="/sme/*" element={<SMEDashboard />} />
-          <Route path="/school-admin/*" element={<SchoolAdminDashboard />} />
+          <Route path="/school-admin" element={<SchoolAdminDashboard />} />
+          <Route path="/school-admin/teachers" element={<SchoolAdminTeachers />} />
+          <Route path="/school-admin/students" element={<SchoolAdminStudents />} />
+          <Route path="/school-admin/upload" element={<SchoolAdminUpload />} />
+          <Route path="/school-admin/sessions" element={<SchoolAdminSessions />} />
+          <Route path="/school-admin/notifications" element={<SchoolAdminNotifications />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
