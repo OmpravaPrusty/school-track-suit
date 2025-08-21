@@ -36,7 +36,38 @@ interface Teacher {
 }
 
 const SchoolAdminTeachers = () => {
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([
+    {
+      id: "1",
+      full_name: "Ravi Krishnan",
+      email: "ravi.krishnan@school.edu.in",
+      phone: "+91-9876543210",
+      specialization: "Mathematics",
+      status: "active",
+      hire_date: "2020-06-15",
+      employee_id: "EMP001",
+    },
+    {
+      id: "2", 
+      full_name: "Lakshmi Pillai",
+      email: "lakshmi.pillai@school.edu.in",
+      phone: "+91-8765432109",
+      specialization: "Science",
+      status: "active",
+      hire_date: "2019-08-20",
+      employee_id: "EMP002",
+    },
+    {
+      id: "3",
+      full_name: "Suresh Kumar",
+      email: "suresh.kumar@school.edu.in", 
+      phone: "+91-7654321098",
+      specialization: "English",
+      status: "active",
+      hire_date: "2021-01-10",
+      employee_id: "EMP003",
+    },
+  ]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);

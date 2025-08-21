@@ -43,11 +43,11 @@ const navigationItems = [
     url: "/admin/schools",
     icon: School,
   },
-  {
-    title: "Organizations",
-    url: "/admin/organizations",
-    icon: Building,
-  },
+  // {
+  //   title: "Organizations",
+  //   url: "/admin/organizations",
+  //   icon: Building,
+  // },
   {
     title: "Sessions",
     url: "/admin/sessions",

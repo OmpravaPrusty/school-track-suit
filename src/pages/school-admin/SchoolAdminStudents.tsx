@@ -44,7 +44,41 @@ interface Batch {
 }
 
 const SchoolAdminStudents = () => {
-  const [students, setStudents] = useState<Student[]>([]);
+  const [students, setStudents] = useState<Student[]>([
+    {
+      id: "1",
+      student_id: "STU001",
+      enrollment_date: "2024-06-01",
+      batch_id: "batch1",
+      full_name: "Aditya Menon",
+      email: "aditya.menon@school.edu.in",
+      phone: "+91-9876543210",
+      status: "active",
+      batch_name: "Class 10A"
+    },
+    {
+      id: "2",
+      student_id: "STU002", 
+      enrollment_date: "2024-06-01",
+      batch_id: "batch1",
+      full_name: "Nisha Sharma",
+      email: "nisha.sharma@school.edu.in",
+      phone: "+91-8765432109",
+      status: "active",
+      batch_name: "Class 10A"
+    },
+    {
+      id: "3",
+      student_id: "STU003",
+      enrollment_date: "2024-06-01", 
+      batch_id: "batch2",
+      full_name: "Kiran Kumar",
+      email: "kiran.kumar@school.edu.in",
+      phone: "+91-7654321098",
+      status: "active",
+      batch_name: "Class 9B"
+    },
+  ]);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");

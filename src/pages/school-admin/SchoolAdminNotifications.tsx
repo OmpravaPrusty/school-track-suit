@@ -45,7 +45,38 @@ interface User {
 }
 
 const SchoolAdminNotifications = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([
+    {
+      id: "1",
+      title: "Student Absence Alert",
+      message: "Aditya Menon was absent from Mathematics class today",
+      type: "warning",
+      read: false,
+      created_at: "2024-08-21T10:30:00Z",
+      recipient_name: "Aditya Menon",
+      recipient_type: "individual"
+    },
+    {
+      id: "2",
+      title: "Teacher Unavailable",
+      message: "Lakshmi Pillai will be unavailable for Science class tomorrow due to emergency",
+      type: "error",
+      read: false,
+      created_at: "2024-08-21T09:15:00Z",
+      recipient_name: "Lakshmi Pillai",
+      recipient_type: "individual"
+    },
+    {
+      id: "3",
+      title: "Session Reminder",
+      message: "Mathematics session starts in 30 minutes",
+      type: "info",
+      read: true,
+      created_at: "2024-08-21T09:30:00Z",
+      recipient_name: "Ravi Krishnan",
+      recipient_type: "individual"
+    },
+  ]);
   const [teachers, setTeachers] = useState<User[]>([]);
   const [students, setStudents] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);

@@ -22,35 +22,42 @@ interface Teacher {
   status: "active" | "inactive";
 }
 
-const mockOrganizations = ["Tech University", "Science Academy", "Arts Institute"];
-const mockSchools = {
-  "Tech University": ["Engineering College", "IT College"],
-  "Science Academy": ["Physics Department", "Chemistry Department"],
-  "Arts Institute": ["Fine Arts School", "Music School"],
-};
+// const mockOrganizations = ["Tech University", "Science Academy", "Arts Institute"];
+const mockSchools = ["Malanad Higher Secondary School", "St. Mary's Convent School", "Bharatiya Vidya Bhavan School"];
 
 const TeacherManagement = () => {
   const [teachers, setTeachers] = useState<Teacher[]>([
     {
       id: "1",
-      name: "Dr. John Smith",
-      email: "john.smith@tech.edu",
-      phone: "+1234567890",
-      subject: "Computer Science",
-      organization: "Tech University",
-      school: "Engineering College",
+      name: "Rajesh Kumar",
+      email: "rajesh.kumar@malanada.edu.in",
+      phone: "+91-9876543210",
+      subject: "Mathematics",
+      organization: "", // Commented out
+      school: "Malanad Higher Secondary School",
       experience: "5 years",
       status: "active",
     },
     {
       id: "2",
-      name: "Prof. Sarah Johnson",
-      email: "sarah.j@science.edu",
-      phone: "+1234567891",
+      name: "Priya Nair",
+      email: "priya.nair@stmarys.edu.in",
+      phone: "+91-8765432109",
       subject: "Physics",
-      organization: "Science Academy",
-      school: "Physics Department",
+      organization: "", // Commented out
+      school: "St. Mary's Convent School",
       experience: "8 years",
+      status: "active",
+    },
+    {
+      id: "3",
+      name: "Arjun Menon",
+      email: "arjun.menon@bvb.edu.in",
+      phone: "+91-7654321098",
+      subject: "Chemistry",
+      organization: "", // Commented out
+      school: "Bharatiya Vidya Bhavan School",
+      experience: "3 years",
       status: "active",
     },
   ]);
@@ -71,7 +78,7 @@ const TeacherManagement = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.email || !formData.organization || !formData.school) {
+    if (!formData.name || !formData.email || !formData.school) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -148,9 +155,9 @@ const TeacherManagement = () => {
     teacher.subject.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const availableSchools = formData.organization 
-    ? mockSchools[formData.organization as keyof typeof mockSchools] || []
-    : [];
+  // const availableSchools = formData.organization 
+  //   ? mockSchools[formData.organization as keyof typeof mockSchools] || []
+  //   : [];
 
   return (
     <div className="space-y-6">
@@ -214,7 +221,7 @@ const TeacherManagement = () => {
                     placeholder="Subject taught"
                   />
                 </div>
-                <div className="space-y-2">
+                {/* <div className="space-y-2">
                   <Label htmlFor="organization">Organization *</Label>
                   <Select 
                     value={formData.organization} 
@@ -229,19 +236,18 @@ const TeacherManagement = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </div> */}
                 <div className="space-y-2">
                   <Label htmlFor="school">School *</Label>
                   <Select 
                     value={formData.school} 
                     onValueChange={(value) => setFormData({ ...formData, school: value })}
-                    disabled={!formData.organization}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select school" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableSchools.map((school) => (
+                      {mockSchools.map((school) => (
                         <SelectItem key={school} value={school}>{school}</SelectItem>
                       ))}
                     </SelectContent>
@@ -293,7 +299,7 @@ const TeacherManagement = () => {
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Subject</TableHead>
-                <TableHead>Organization</TableHead>
+                {/* <TableHead>Organization</TableHead> */}
                 <TableHead>School</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
@@ -305,7 +311,7 @@ const TeacherManagement = () => {
                   <TableCell className="font-medium">{teacher.name}</TableCell>
                   <TableCell>{teacher.email}</TableCell>
                   <TableCell>{teacher.subject}</TableCell>
-                  <TableCell>{teacher.organization}</TableCell>
+                  {/* <TableCell>{teacher.organization}</TableCell> */}
                   <TableCell>{teacher.school}</TableCell>
                   <TableCell>
                     <Badge variant={teacher.status === "active" ? "default" : "secondary"}>

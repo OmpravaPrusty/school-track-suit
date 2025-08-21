@@ -64,7 +64,40 @@ interface Batch {
 }
 
 const SchoolAdminSessions = () => {
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([
+    {
+      id: "1",
+      title: "Mathematics - Algebra",
+      description: "Introduction to Algebraic Equations",
+      session_date: "2024-08-25",
+      start_time: "10:00",
+      end_time: "11:00",
+      status: "scheduled",
+      meeting_link: "https://meet.google.com/abc-defg-hij",
+      course_id: "course1",
+      teacher_id: "teacher1",
+      batch_id: "batch1",
+      course_name: "Mathematics",
+      teacher_name: "Ravi Krishnan",
+      batch_name: "Class 10A"
+    },
+    {
+      id: "2",
+      title: "Science - Physics",
+      description: "Laws of Motion",
+      session_date: "2024-08-26",
+      start_time: "14:00", 
+      end_time: "15:00",
+      status: "completed",
+      meeting_link: "https://meet.google.com/xyz-uvwx-yz",
+      course_id: "course2",
+      teacher_id: "teacher2",
+      batch_id: "batch1",
+      course_name: "Science",
+      teacher_name: "Lakshmi Pillai",
+      batch_name: "Class 10A"
+    },
+  ]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);

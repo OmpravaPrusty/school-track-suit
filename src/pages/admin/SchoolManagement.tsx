@@ -22,28 +22,38 @@ interface School {
   status: "active" | "inactive";
 }
 
-const mockOrganizations = ["Tech University", "Science Academy", "Arts Institute"];
+// const mockOrganizations = ["Tech University", "Science Academy", "Arts Institute"];
 
 const SchoolManagement = () => {
   const [schools, setSchools] = useState<School[]>([
     {
       id: "1",
-      name: "Engineering College",
-      email: "info@engineering.tech.edu",
-      phone: "+1234567890",
-      address: "123 Tech Street, Tech City, TC 12345",
-      organization: "Tech University",
+      name: "Malanad Higher Secondary School",
+      email: "info@malanada.edu.in",
+      phone: "+91-9876543210",
+      address: "MG Road, Kozhikode, Kerala 673001",
+      organization: "", // Commented out
       establishedYear: "1985",
       status: "active",
     },
     {
       id: "2",
-      name: "Physics Department",
-      email: "physics@science.edu",
-      phone: "+1234567891",
-      address: "456 Science Ave, Science City, SC 67890",
-      organization: "Science Academy",
+      name: "St. Mary's Convent School",
+      email: "principal@stmarys.edu.in",
+      phone: "+91-8765432109",
+      address: "Church Street, Thrissur, Kerala 680001",
+      organization: "", // Commented out
       establishedYear: "1978",
+      status: "active",
+    },
+    {
+      id: "3",
+      name: "Bharatiya Vidya Bhavan School",
+      email: "contact@bvb.edu.in",
+      phone: "+91-7654321098",
+      address: "Gandhi Nagar, Ernakulam, Kerala 682020",
+      organization: "", // Commented out
+      establishedYear: "1992",
       status: "active",
     },
   ]);
@@ -63,7 +73,7 @@ const SchoolManagement = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.email || !formData.organization) {
+    if (!formData.name || !formData.email) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -200,7 +210,7 @@ const SchoolManagement = () => {
                     placeholder="1985"
                   />
                 </div>
-                <div className="space-y-2">
+                {/* <div className="space-y-2">
                   <Label htmlFor="organization">Organization *</Label>
                   <Select 
                     value={formData.organization} 
@@ -215,7 +225,7 @@ const SchoolManagement = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </div> */}
                 <div className="space-y-2 col-span-1">
                 </div>
                 <div className="space-y-2 col-span-2">
@@ -264,7 +274,7 @@ const SchoolManagement = () => {
               <TableRow>
                 <TableHead>School Name</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Organization</TableHead>
+                {/* <TableHead>Organization</TableHead> */}
                 <TableHead>Established</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
@@ -275,7 +285,7 @@ const SchoolManagement = () => {
                 <TableRow key={school.id}>
                   <TableCell className="font-medium">{school.name}</TableCell>
                   <TableCell>{school.email}</TableCell>
-                  <TableCell>{school.organization}</TableCell>
+                  {/* <TableCell>{school.organization}</TableCell> */}
                   <TableCell>{school.establishedYear}</TableCell>
                   <TableCell>
                     <Badge variant={school.status === "active" ? "default" : "secondary"}>
