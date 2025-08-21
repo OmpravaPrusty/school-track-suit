@@ -25,8 +25,20 @@ interface Teacher {
 }
 
 const SchoolAdminUpload = () => {
-  const [students, setStudents] = useState<Student[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [students, setStudents] = useState<Student[]>([
+    { id: "s1", full_name: "Rahul Sharma", student_id: "ST001" },
+    { id: "s2", full_name: "Priya Nair", student_id: "ST002" },
+    { id: "s3", full_name: "Arjun Menon", student_id: "ST003" },
+    { id: "s4", full_name: "Kavya Krishnan", student_id: "ST004" },
+    { id: "s5", full_name: "Amal Thomas", student_id: "ST005" }
+  ]);
+  const [teachers, setTeachers] = useState<Teacher[]>([
+    { id: "t1", full_name: "Dr. Rajesh Kumar", specialization: "Mathematics" },
+    { id: "t2", full_name: "Mrs. Sunitha Nair", specialization: "Physics" },
+    { id: "t3", full_name: "Mr. Vishnu Pillai", specialization: "Chemistry" },
+    { id: "t4", full_name: "Ms. Lakshmi Menon", specialization: "Biology" },
+    { id: "t5", full_name: "Mr. Santhosh Kumar", specialization: "English" }
+  ]);
   const [selectedStudent, setSelectedStudent] = useState("");
   const [selectedTeacher, setSelectedTeacher] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -161,6 +173,16 @@ const SchoolAdminUpload = () => {
             }}
             disabled={uploading || (!selectedStudent && !selectedTeacher)}
           />
+          {type === 'video' && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Supported formats: MP4, AVI, MOV, WMV (Max: 100MB)
+            </p>
+          )}
+          {type === 'pdf' && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Supported format: PDF (Max: 10MB)
+            </p>
+          )}
         </div>
       </CardContent>
     </Card>

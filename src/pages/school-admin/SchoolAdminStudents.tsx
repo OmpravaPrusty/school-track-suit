@@ -79,7 +79,12 @@ const SchoolAdminStudents = () => {
       batch_name: "Class 9B"
     },
   ]);
-  const [batches, setBatches] = useState<Batch[]>([]);
+  const [batches, setBatches] = useState<Batch[]>([
+    { id: "batch-1", name: "Batch A" },
+    { id: "batch-2", name: "Batch B" },
+    { id: "batch-3", name: "Batch C" },
+    { id: "batch-4", name: "Batch D" }
+  ]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);

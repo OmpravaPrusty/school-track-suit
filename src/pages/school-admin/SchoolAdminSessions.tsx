@@ -98,9 +98,26 @@ const SchoolAdminSessions = () => {
       batch_name: "Class 10A"
     },
   ]);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [batches, setBatches] = useState<Batch[]>([]);
+  const [courses, setCourses] = useState<Course[]>([
+    { id: "c1", name: "Mathematics" },
+    { id: "c2", name: "Physics" },
+    { id: "c3", name: "Chemistry" }, 
+    { id: "c4", name: "Biology" },
+    { id: "c5", name: "English" }
+  ]);
+  const [teachers, setTeachers] = useState<Teacher[]>([
+    { id: "t1", full_name: "Dr. Rajesh Kumar" },
+    { id: "t2", full_name: "Mrs. Sunitha Nair" },
+    { id: "t3", full_name: "Mr. Vishnu Pillai" },
+    { id: "t4", full_name: "Ms. Lakshmi Menon" },
+    { id: "t5", full_name: "Mr. Santhosh Kumar" }
+  ]);
+  const [batches, setBatches] = useState<Batch[]>([
+    { id: "b1", name: "Class 12A" },
+    { id: "b2", name: "Class 11B" },
+    { id: "b3", name: "Class 10C" },
+    { id: "b4", name: "Class 9D" }
+  ]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
