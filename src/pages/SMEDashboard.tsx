@@ -7,6 +7,7 @@ import SMESessions from "./sme/SMESessions";
 import SMEStudents from "./sme/SMEStudents";
 import SMENotifications from "./sme/SMENotifications";
 import SMEAssignCourses from "./sme/SMEAssignCourses";
+import SMEAttendance from "./sme/SMEAttendance";
 
 const SMEDashboard = () => {
   return (
@@ -23,6 +24,7 @@ const SMEDashboard = () => {
                 <Route path="students" element={<SMEStudents />} />
                 <Route path="notifications" element={<SMENotifications />} />
                 <Route path="assign-courses" element={<SMEAssignCourses />} />
+                <Route path="attendance" element={<SMEAttendance />} />
                 <Route path="*" element={<Navigate to="/sme" replace />} />
               </Routes>
             </div>

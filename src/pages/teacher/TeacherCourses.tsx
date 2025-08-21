@@ -16,7 +16,7 @@ const TeacherCourses = () => {
         {[
           {
             title: "Advanced Mathematics",
-            assignedBy: "Dr. John Smith (SME)",
+            assignedBy: "Dr. Rajesh Kumar (SME)",
             students: 28,
             progress: 65,
             totalLessons: 20,
@@ -25,8 +25,8 @@ const TeacherCourses = () => {
             status: "In Progress"
           },
           {
-            title: "Physics Fundamentals",
-            assignedBy: "Prof. Sarah Johnson (SME)",
+            title: "Physics Fundamentals", 
+            assignedBy: "Prof. Lakshmi Menon (SME)",
             students: 32,
             progress: 45,
             totalLessons: 16,
@@ -36,7 +36,7 @@ const TeacherCourses = () => {
           },
           {
             title: "Chemistry Basics",
-            assignedBy: "Dr. Michael Brown (SME)",
+            assignedBy: "Dr. Suresh Nair (SME)",
             students: 25,
             progress: 100,
             totalLessons: 14,
@@ -46,7 +46,7 @@ const TeacherCourses = () => {
           },
           {
             title: "English Literature",
-            assignedBy: "Ms. Emily Davis (SME)",
+            assignedBy: "Ms. Priya Sharma (SME)",
             students: 30,
             progress: 30,
             totalLessons: 18,
@@ -56,7 +56,7 @@ const TeacherCourses = () => {
           },
           {
             title: "Computer Science",
-            assignedBy: "Mr. David Wilson (SME)",
+            assignedBy: "Mr. Arun Krishnan (SME)",
             students: 22,
             progress: 80,
             totalLessons: 12,
@@ -66,7 +66,7 @@ const TeacherCourses = () => {
           },
           {
             title: "Biology Essentials",
-            assignedBy: "Dr. Lisa Anderson (SME)",
+            assignedBy: "Dr. Kavitha Pillai (SME)",
             students: 26,
             progress: 55,
             totalLessons: 15,

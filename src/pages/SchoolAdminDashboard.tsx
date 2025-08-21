@@ -71,24 +71,24 @@ const SchoolAdminDashboard = () => {
               <div className="flex items-center space-x-4 p-4 border rounded-lg">
                 <School className="h-8 w-8 text-primary" />
                 <div className="flex-1">
-                  <h4 className="font-medium">Engineering College</h4>
-                  <p className="text-sm text-muted-foreground">Tech University</p>
-                  <p className="text-sm text-muted-foreground">Established: 1985</p>
+                  <h4 className="font-medium">Malanada Higher Secondary School</h4>
+                  <p className="text-sm text-muted-foreground">Kollam District, Kerala</p>
+                  <p className="text-sm text-muted-foreground">Established: 1965</p>
                 </div>
                 <Badge>Active</Badge>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium">Departments</h4>
-                  <p className="text-2xl font-bold">8</p>
-                  <p className="text-sm text-muted-foreground">Active departments</p>
+                  <h4 className="font-medium">Classes</h4>
+                  <p className="text-2xl font-bold">12</p>
+                  <p className="text-sm text-muted-foreground">Std 1 to 12</p>
                 </div>
                 
                 <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium">Batches</h4>
-                  <p className="text-2xl font-bold">3</p>
-                  <p className="text-sm text-muted-foreground">2023, 2024, 2025</p>
+                  <h4 className="font-medium">Sections</h4>
+                  <p className="text-2xl font-bold">24</p>
+                  <p className="text-sm text-muted-foreground">A & B sections</p>
                 </div>
               </div>
             </CardContent>
@@ -104,7 +104,7 @@ const SchoolAdminDashboard = () => {
                 <Clock className="h-8 w-8 text-primary" />
                 <div className="flex-1">
                   <h4 className="font-medium">New Teacher Added</h4>
-                  <p className="text-sm text-muted-foreground">Dr. Sarah Johnson joined Physics Dept</p>
+                  <p className="text-sm text-muted-foreground">Priya Nair joined Mathematics Department</p>
                   <p className="text-sm text-muted-foreground">2 hours ago</p>
                 </div>
               </div>
@@ -113,7 +113,7 @@ const SchoolAdminDashboard = () => {
                 <Clock className="h-8 w-8 text-primary" />
                 <div className="flex-1">
                   <h4 className="font-medium">Attendance Report Generated</h4>
-                  <p className="text-sm text-muted-foreground">Monthly report for Batch 2024</p>
+                  <p className="text-sm text-muted-foreground">Monthly report for Class 10-A</p>
                   <p className="text-sm text-muted-foreground">1 day ago</p>
                 </div>
               </div>
@@ -122,7 +122,7 @@ const SchoolAdminDashboard = () => {
                 <Clock className="h-8 w-8 text-primary" />
                 <div className="flex-1">
                   <h4 className="font-medium">Session Completed</h4>
-                  <p className="text-sm text-muted-foreground">Machine Learning Workshop</p>
+                  <p className="text-sm text-muted-foreground">Science Exhibition Workshop</p>
                   <p className="text-sm text-muted-foreground">3 days ago</p>
                 </div>
               </div>
@@ -130,45 +130,45 @@ const SchoolAdminDashboard = () => {
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Department Performance</CardTitle>
-            <CardDescription>Attendance and performance by department</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 border rounded-lg">
-                <h4 className="font-medium">Computer Science</h4>
-                <p className="text-sm text-muted-foreground">Students: 320</p>
-                <p className="text-sm text-muted-foreground">Teachers: 18</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-sm">Attendance:</span>
-                  <Badge>89%</Badge>
+          <Card>
+            <CardHeader>
+              <CardTitle>Class Performance</CardTitle>
+              <CardDescription>Attendance and performance by class</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 border rounded-lg">
+                  <h4 className="font-medium">Class 10</h4>
+                  <p className="text-sm text-muted-foreground">Students: 120</p>
+                  <p className="text-sm text-muted-foreground">Teachers: 8</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-sm">Attendance:</span>
+                    <Badge>89%</Badge>
+                  </div>
+                </div>
+                
+                <div className="p-4 border rounded-lg">
+                  <h4 className="font-medium">Class 11</h4>
+                  <p className="text-sm text-muted-foreground">Students: 95</p>
+                  <p className="text-sm text-muted-foreground">Teachers: 10</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-sm">Attendance:</span>
+                    <Badge>85%</Badge>
+                  </div>
+                </div>
+                
+                <div className="p-4 border rounded-lg">
+                  <h4 className="font-medium">Class 12</h4>
+                  <p className="text-sm text-muted-foreground">Students: 88</p>
+                  <p className="text-sm text-muted-foreground">Teachers: 12</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-sm">Attendance:</span>
+                    <Badge>87%</Badge>
+                  </div>
                 </div>
               </div>
-              
-              <div className="p-4 border rounded-lg">
-                <h4 className="font-medium">Electrical Engineering</h4>
-                <p className="text-sm text-muted-foreground">Students: 280</p>
-                <p className="text-sm text-muted-foreground">Teachers: 15</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-sm">Attendance:</span>
-                  <Badge>85%</Badge>
-                </div>
-              </div>
-              
-              <div className="p-4 border rounded-lg">
-                <h4 className="font-medium">Mechanical Engineering</h4>
-                <p className="text-sm text-muted-foreground">Students: 350</p>
-                <p className="text-sm text-muted-foreground">Teachers: 20</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-sm">Attendance:</span>
-                  <Badge>87%</Badge>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
             </div>
           </main>
         </div>

@@ -39,6 +39,11 @@ const navigationItems = [
     icon: BookOpen,
   },
   {
+    title: "My Attendance",
+    url: "/sme/attendance",
+    icon: UserCheck,
+  },
+  {
     title: "Notifications",
     url: "/sme/notifications",
     icon: Bell,
