@@ -18,7 +18,7 @@ const TeacherNotifications = () => {
             <Bell className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">4</div>
+            <div className="text-2xl font-bold">6</div>
             <p className="text-xs text-muted-foreground">New notifications</p>
           </CardContent>
         </Card>
@@ -85,7 +85,7 @@ const TeacherNotifications = () => {
                 type: "urgent",
                 icon: AlertTriangle,
                 title: "Student Attendance Alert",
-                message: "5 students in Batch 2024-A have attendance below 75%. Please review and take necessary action.",
+                message: "Arjun Menon has attendance below 75% in Mathematics. Please review and take necessary action.",
                 time: "4 hours ago",
                 unread: true
               },

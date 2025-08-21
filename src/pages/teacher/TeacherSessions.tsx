@@ -20,33 +20,33 @@ const TeacherSessions = () => {
           <CardContent className="space-y-4">
             {[
               {
-                title: "Mathematics - Calculus Review",
-                date: "Tomorrow",
-                time: "9:00 AM - 10:30 AM",
-                batch: "Batch 2024-A",
-                subject: "Advanced Mathematics",
+                title: "Advanced Mathematics",
+                date: "2025-01-22",
+                time: "09:00 AM - 10:30 AM",
+                batch: "Class 10-A",
+                subject: "Quadratic Equations",
                 students: 28,
-                meetingLink: "https://zoom.us/j/123456789",
-                status: "Scheduled"
-              },
-              {
-                title: "Physics - Newton's Laws",
-                date: "Jan 26, 2025",
-                time: "11:00 AM - 12:30 PM",
-                batch: "Batch 2024-B",
-                subject: "Physics Fundamentals",
-                students: 32,
                 meetingLink: "https://meet.google.com/abc-defg-hij",
                 status: "Scheduled"
               },
               {
-                title: "English - Poetry Analysis",
-                date: "Jan 27, 2025",
-                time: "2:00 PM - 3:30 PM",
-                batch: "Batch 2024-A",
-                subject: "English Literature",
-                students: 30,
-                meetingLink: "https://zoom.us/j/987654321",
+                title: "Physics Fundamentals",
+                date: "2025-01-22", 
+                time: "11:00 AM - 12:30 PM",
+                batch: "Class 11-B",
+                subject: "Light and Optics",
+                students: 32,
+                meetingLink: "https://meet.google.com/xyz-mnop-qrs",
+                status: "Scheduled"
+              },
+              {
+                title: "Mathematics Workshop",
+                date: "2025-01-23",
+                time: "02:00 PM - 03:30 PM", 
+                batch: "Class 12-A",
+                subject: "Calculus Review",
+                students: 25,
+                meetingLink: "https://meet.google.com/def-ghi-jkl",
                 status: "Scheduled"
               }
             ].map((session, index) => (
@@ -90,30 +90,39 @@ const TeacherSessions = () => {
           <CardContent className="space-y-4">
             {[
               {
-                title: "Chemistry - Organic Compounds",
-                date: "Jan 20, 2025",
-                time: "10:00 AM - 11:30 AM",
-                batch: "Batch 2024-A",
+                title: "Chemistry Basics",
+                date: "2025-01-21",
+                time: "09:00 AM - 10:30 AM",
+                batch: "Class 11-B",
                 students: 25,
-                attendance: 23,
+                attendance: 24,
                 status: "Completed"
               },
               {
-                title: "Computer Science - Algorithms",
-                date: "Jan 18, 2025",
-                time: "2:00 PM - 3:30 PM",
-                batch: "Batch 2024-B",
+                title: "English Literature",
+                date: "2025-01-20",
+                time: "11:00 AM - 12:30 PM",
+                batch: "Class 12-A",
+                students: 30,
+                attendance: 28,
+                status: "Completed"
+              },
+              {
+                title: "Computer Science Lab",
+                date: "2025-01-19",
+                time: "02:00 PM - 04:00 PM",
+                batch: "Class 11-A",
                 students: 22,
                 attendance: 20,
                 status: "Completed"
               },
               {
-                title: "Biology - Cell Structure",
-                date: "Jan 16, 2025",
-                time: "11:00 AM - 12:30 PM",
-                batch: "Batch 2024-A",
+                title: "Biology Workshop",
+                date: "2025-01-18",
+                time: "10:00 AM - 11:30 AM",
+                batch: "Class 10-B",
                 students: 26,
-                attendance: 24,
+                attendance: 25,
                 status: "Completed"
               }
             ].map((session, index) => (
