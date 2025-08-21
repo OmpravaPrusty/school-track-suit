@@ -580,6 +580,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_view_profile: {
+        Args: { _profile_id: string }
+        Returns: boolean
+      }
       get_user_school_id: {
         Args: { _user_id: string }
         Returns: string
