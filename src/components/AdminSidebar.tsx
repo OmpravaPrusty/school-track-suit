@@ -58,6 +58,11 @@ const navigationItems = [
     url: "/admin/reports",
     icon: FileText,
   },
+  {
+    title: "User Management",
+    url: "/admin/user-management",
+    icon: Users,
+  },
 ];
 
 export function AdminSidebar() {

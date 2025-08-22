@@ -1,9 +1,39 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GraduationCap, Users, BookOpen, UserCheck, Building } from "lucide-react";
+import { useAuth } from "@/components/AuthProvider";
+import { useEffect } from "react";
 
 const Index = () => {
+  const { user, getUserRole } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user) {
+      getUserRole().then(role => {
+        // Redirect authenticated users to their dashboard
+        switch (role) {
+          case "admin":
+            navigate("/admin");
+            break;
+          case "school_admin":
+            navigate("/school-admin");
+            break;
+          case "teacher":
+            navigate("/teacher");
+            break;
+          case "sme":
+            navigate("/sme");
+            break;
+          case "student":
+            navigate("/student");
+            break;
+        }
+      });
+    }
+  }, [user, getUserRole, navigate]);
+
   const dashboards = [
     {
       title: "Admin Dashboard",
@@ -62,7 +92,7 @@ const Index = () => {
               </CardHeader>
               <CardContent>
                 <Button asChild className="w-full">
-                  <Link to={dashboard.path}>Access Dashboard</Link>
+                  <Link to="/auth">Sign In</Link>
                 </Button>
               </CardContent>
             </Card>
