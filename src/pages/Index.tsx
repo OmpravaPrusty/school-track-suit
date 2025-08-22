@@ -92,7 +92,7 @@ const Index = () => {
               </CardHeader>
               <CardContent>
                 <Button asChild className="w-full">
-                  <Link to="/auth">Sign In</Link>
+                  <Link to="/admin-setup">Get Started</Link>
                 </Button>
               </CardContent>
             </Card>

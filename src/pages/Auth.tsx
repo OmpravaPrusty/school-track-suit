@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -163,8 +163,10 @@ const Auth = () => {
         </Tabs>
         
         <div className="px-6 pb-6 space-y-2 text-center text-xs text-muted-foreground">
-          <p className="font-medium">Demo Admin Credentials:</p>
-          <p>admin@school.com / admin123</p>
+          <p className="font-medium">Need to set up the system?</p>
+          <Button variant="link" className="h-auto p-0 text-xs" asChild>
+            <Link to="/admin-setup">Create Admin Account</Link>
+          </Button>
         </div>
       </Card>
     </div>
