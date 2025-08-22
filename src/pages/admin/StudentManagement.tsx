@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,16 +24,35 @@ import {
 } from "@/components/ui/table";
 import { Users, Plus, Edit, Trash2, Search } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Student {
-  id: number;
-  name: string;
+  id: string;
+  full_name: string;
   email: string;
-  rollNo: string;
-  batch: string;
-  department: string;
-  phone: string;
-  status: "active" | "inactive";
+  phone?: string;
+  status: "active" | "inactive" | "suspended";
+  students?: {
+    student_id: string;
+    batch_id: string;
+    school_id: string;
+    batches?: {
+      name: string;
+    };
+    schools?: {
+      name: string;
+    };
+  };
+}
+
+interface Batch {
+  id: string;
+  name: string;
+}
+
+interface School {
+  id: string;
+  name: string;
 }
 
 const StudentManagement = () => {
@@ -41,77 +60,100 @@ const StudentManagement = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [schools, setSchools] = useState<School[]>([]);
+  const [loading, setLoading] = useState(true);
   const [newStudent, setNewStudent] = useState({
-    name: "",
+    full_name: "",
     email: "",
-    rollNo: "",
-    batch: "",
-    department: "",
     phone: "",
+    student_id: "",
+    batch_id: "",
+    school_id: "",
+    password: "",
   });
 
-  // Mock student data with Indian names
-  const [students, setStudents] = useState<Student[]>([
-    {
-      id: 1,
-      name: "Aarav Sharma",
-      email: "aarav.sharma@malanada.edu.in",
-      rollNo: "2024001",
-      batch: "2024",
-      department: "Computer Science",
-      phone: "+91-9876543210",
-      status: "active",
-    },
-    {
-      id: 2,
-      name: "Ananya Nair",
-      email: "ananya.nair@stmarys.edu.in",
-      rollNo: "2024002",
-      batch: "2024",
-      department: "Mathematics",
-      phone: "+91-8765432109",
-      status: "active",
-    },
-    {
-      id: 3,
-      name: "Rohit Menon",
-      email: "rohit.menon@bvb.edu.in",
-      rollNo: "2023045",
-      batch: "2023",
-      department: "Physics",
-      phone: "+91-7654321098",
-      status: "inactive",
-    },
-    {
-      id: 4,
-      name: "Kavya Pillai",
-      email: "kavya.pillai@malanada.edu.in",
-      rollNo: "2025001",
-      batch: "2025",
-      department: "Chemistry",
-      phone: "+91-6543210987",
-      status: "active",
-    },
-    {
-      id: 5,
-      name: "Arjun Kumar",
-      email: "arjun.kumar@stmarys.edu.in",
-      rollNo: "2024003",
-      batch: "2024",
-      department: "Biology",
-      phone: "+91-5432109876",
-      status: "active",
-    },
-  ]);
+  // Generate a random password
+  const generateRandomPassword = () => {
+    const length = 8;
+    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let result = "";
+    for (let i = 0; i < length; i++) {
+      result += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    return result;
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      // Fetch students with batch and school info
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          full_name,
+          email,
+          phone,
+          status,
+          students!inner (
+            student_id,
+            batch_id,
+            school_id,
+            batches (
+              name
+            ),
+            schools (
+              name
+            )
+          )
+        `);
+
+      if (studentsError) throw studentsError;
+
+      // Fetch batches
+      const { data: batchesData, error: batchesError } = await supabase
+        .from('batches')
+        .select('id, name')
+        .order('name');
+
+      if (batchesError) throw batchesError;
+
+      // Fetch schools
+      const { data: schoolsData, error: schoolsError } = await supabase
+        .from('schools')
+        .select('id, name')
+        .order('name');
+
+      if (schoolsError) throw schoolsError;
+
+      setStudents(studentsData || []);
+      setBatches(batchesData || []);
+      setSchools(schoolsData || []);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredStudents = students.filter(student =>
-    student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.rollNo.toLowerCase().includes(searchTerm.toLowerCase())
+    (student.students?.student_id || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleAddStudent = () => {
-    if (!newStudent.name || !newStudent.email || !newStudent.rollNo) {
+  const handleAddStudent = async () => {
+    if (!newStudent.full_name || !newStudent.email || !newStudent.school_id) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields",
@@ -120,61 +162,157 @@ const StudentManagement = () => {
       return;
     }
 
-    const student: Student = {
-      id: students.length + 1,
-      ...newStudent,
-      status: "active",
-    };
+    try {
+      // Generate password if not provided
+      const password = newStudent.password || generateRandomPassword();
 
-    setStudents(prev => [...prev, student]);
-    setNewStudent({
-      name: "",
-      email: "",
-      rollNo: "",
-      batch: "",
-      department: "",
-      phone: "",
-    });
-    setIsAddDialogOpen(false);
-    
-    toast({
-      title: "Student Added",
-      description: `${student.name} has been successfully added`,
-    });
+      // Create user in Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: newStudent.email,
+        password: password,
+        options: {
+          data: {
+            full_name: newStudent.full_name,
+            phone: newStudent.phone,
+          }
+        }
+      });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        // Insert into students table
+        const { error: studentError } = await supabase
+          .from('students')
+          .insert({
+            id: authData.user.id,
+            student_id: newStudent.student_id,
+            batch_id: newStudent.batch_id || null,
+            school_id: newStudent.school_id,
+          });
+
+        if (studentError) throw studentError;
+
+        // Insert role
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({
+            user_id: authData.user.id,
+            role: 'student'
+          });
+
+        if (roleError) throw roleError;
+
+        toast({
+          title: "Student Added",
+          description: `${newStudent.full_name} has been successfully added with password: ${password}`,
+        });
+
+        // Reset form and refresh data
+        setNewStudent({
+          full_name: "",
+          email: "",
+          phone: "",
+          student_id: "",
+          batch_id: "",
+          school_id: "",
+          password: "",
+        });
+        setIsAddDialogOpen(false);
+        fetchData();
+      }
+    } catch (error: any) {
+      console.error('Error creating student:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create student",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleEditStudent = () => {
+  const handleEditStudent = async () => {
     if (!selectedStudent) return;
 
-    setStudents(prev =>
-      prev.map(student =>
-        student.id === selectedStudent.id ? selectedStudent : student
-      )
-    );
+    try {
+      // Update profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          full_name: selectedStudent.full_name,
+          phone: selectedStudent.phone,
+        })
+        .eq('id', selectedStudent.id);
 
-    setIsEditDialogOpen(false);
-    setSelectedStudent(null);
-    
-    toast({
-      title: "Student Updated",
-      description: "Student information has been successfully updated",
-    });
+      if (profileError) throw profileError;
+
+      // Update student record if exists
+      if (selectedStudent.students) {
+        const studentData = selectedStudent.students;
+        const { error: studentError } = await supabase
+          .from('students')
+          .update({
+            student_id: studentData.student_id,
+            batch_id: studentData.batch_id,
+            school_id: studentData.school_id,
+          })
+          .eq('id', selectedStudent.id);
+
+        if (studentError) throw studentError;
+      }
+
+      setIsEditDialogOpen(false);
+      setSelectedStudent(null);
+      fetchData();
+      
+      toast({
+        title: "Student Updated",
+        description: "Student information has been successfully updated",
+      });
+    } catch (error: any) {
+      console.error('Error updating student:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update student",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDeleteStudent = (id: number) => {
-    const student = students.find(s => s.id === id);
-    setStudents(prev => prev.filter(s => s.id !== id));
-    
-    toast({
-      title: "Student Deleted",
-      description: `${student?.name} has been removed from the system`,
-    });
+  const handleDeleteStudent = async (id: string) => {
+    try {
+      // Delete from auth will cascade to other tables
+      const { error } = await supabase.auth.admin.deleteUser(id);
+      
+      if (error) throw error;
+      
+      fetchData();
+      toast({
+        title: "Student Deleted",
+        description: "Student has been removed from the system",
+      });
+    } catch (error: any) {
+      console.error('Error deleting student:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete student",
+        variant: "destructive",
+      });
+    }
   };
 
   const openEditDialog = (student: Student) => {
     setSelectedStudent({ ...student });
     setIsEditDialogOpen(true);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -221,8 +359,8 @@ const StudentManagement = () => {
                       <Label htmlFor="add-name">Full Name *</Label>
                       <Input
                         id="add-name"
-                        value={newStudent.name}
-                        onChange={(e) => setNewStudent(prev => ({ ...prev, name: e.target.value }))}
+                        value={newStudent.full_name}
+                        onChange={(e) => setNewStudent(prev => ({ ...prev, full_name: e.target.value }))}
                         placeholder="Enter full name"
                       />
                     </div>
@@ -237,43 +375,57 @@ const StudentManagement = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="add-rollno">Roll Number *</Label>
-                      <Input
-                        id="add-rollno"
-                        value={newStudent.rollNo}
-                        onChange={(e) => setNewStudent(prev => ({ ...prev, rollNo: e.target.value }))}
-                        placeholder="Enter roll number"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="add-batch">Batch</Label>
-                      <Select value={newStudent.batch} onValueChange={(value) => setNewStudent(prev => ({ ...prev, batch: value }))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select batch" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-popover">
-                          <SelectItem value="2023">Batch 2023</SelectItem>
-                          <SelectItem value="2024">Batch 2024</SelectItem>
-                          <SelectItem value="2025">Batch 2025</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="add-department">Department</Label>
-                      <Input
-                        id="add-department"
-                        value={newStudent.department}
-                        onChange={(e) => setNewStudent(prev => ({ ...prev, department: e.target.value }))}
-                        placeholder="Enter department"
-                      />
-                    </div>
-                    <div className="space-y-2">
                       <Label htmlFor="add-phone">Phone</Label>
                       <Input
                         id="add-phone"
                         value={newStudent.phone}
                         onChange={(e) => setNewStudent(prev => ({ ...prev, phone: e.target.value }))}
                         placeholder="Enter phone number"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-student-id">Student ID</Label>
+                      <Input
+                        id="add-student-id"
+                        value={newStudent.student_id}
+                        onChange={(e) => setNewStudent(prev => ({ ...prev, student_id: e.target.value }))}
+                        placeholder="Enter student ID"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-school">School *</Label>
+                      <Select value={newStudent.school_id} onValueChange={(value) => setNewStudent(prev => ({ ...prev, school_id: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select school" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-popover">
+                          {schools.map((school) => (
+                            <SelectItem key={school.id} value={school.id}>{school.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-batch">Batch</Label>
+                      <Select value={newStudent.batch_id} onValueChange={(value) => setNewStudent(prev => ({ ...prev, batch_id: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select batch" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-popover">
+                          {batches.map((batch) => (
+                            <SelectItem key={batch.id} value={batch.id}>{batch.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-password">Password (optional)</Label>
+                      <Input
+                        id="add-password"
+                        type="password"
+                        value={newStudent.password}
+                        onChange={(e) => setNewStudent(prev => ({ ...prev, password: e.target.value }))}
+                        placeholder="Leave empty for auto-generated"
                       />
                     </div>
                   </div>
@@ -296,52 +448,52 @@ const StudentManagement = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Roll No</TableHead>
+                  <TableHead>Student ID</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Batch</TableHead>
-                  <TableHead>Department</TableHead>
+                  <TableHead>School</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredStudents.map((student) => (
-                  <TableRow key={student.id} className="hover:bg-muted/30">
-                    <TableCell className="font-medium">{student.name}</TableCell>
-                    <TableCell>{student.rollNo}</TableCell>
-                    <TableCell>{student.email}</TableCell>
-                    <TableCell>{student.batch}</TableCell>
-                    <TableCell>{student.department}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={student.status === "active" ? "default" : "secondary"}
-                        className={student.status === "active" ? "bg-success text-success-foreground" : ""}
-                      >
-                        {student.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEditDialog(student)}
-                          className="hover:bg-accent"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteStudent(student.id)}
-                          className="hover:bg-destructive hover:text-destructive-foreground"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                 {filteredStudents.map((student) => (
+                   <TableRow key={student.id} className="hover:bg-muted/30">
+                     <TableCell className="font-medium">{student.full_name}</TableCell>
+                     <TableCell>{student.students?.student_id || '-'}</TableCell>
+                     <TableCell>{student.email}</TableCell>
+                     <TableCell>{student.students?.batches?.name || '-'}</TableCell>
+                     <TableCell>{student.students?.schools?.name || '-'}</TableCell>
+                     <TableCell>
+                       <Badge
+                         variant={student.status === "active" ? "default" : "secondary"}
+                         className={student.status === "active" ? "bg-success text-success-foreground" : ""}
+                       >
+                         {student.status}
+                       </Badge>
+                     </TableCell>
+                     <TableCell>
+                       <div className="flex items-center gap-2">
+                         <Button
+                           variant="outline"
+                           size="sm"
+                           onClick={() => openEditDialog(student)}
+                           className="hover:bg-accent"
+                         >
+                           <Edit className="h-4 w-4" />
+                         </Button>
+                         <Button
+                           variant="outline"
+                           size="sm"
+                           onClick={() => handleDeleteStudent(student.id)}
+                           className="hover:bg-destructive hover:text-destructive-foreground"
+                         >
+                           <Trash2 className="h-4 w-4" />
+                         </Button>
+                       </div>
+                     </TableCell>
+                   </TableRow>
+                 ))}
               </TableBody>
             </Table>
           </div>
@@ -370,8 +522,8 @@ const StudentManagement = () => {
                 <Label htmlFor="edit-name">Full Name *</Label>
                 <Input
                   id="edit-name"
-                  value={selectedStudent.name}
-                  onChange={(e) => setSelectedStudent(prev => prev ? ({ ...prev, name: e.target.value }) : null)}
+                  value={selectedStudent.full_name}
+                  onChange={(e) => setSelectedStudent(prev => prev ? ({ ...prev, full_name: e.target.value }) : null)}
                   placeholder="Enter full name"
                 />
               </div>
@@ -383,37 +535,6 @@ const StudentManagement = () => {
                   value={selectedStudent.email}
                   onChange={(e) => setSelectedStudent(prev => prev ? ({ ...prev, email: e.target.value }) : null)}
                   placeholder="Enter email address"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-rollno">Roll Number *</Label>
-                <Input
-                  id="edit-rollno"
-                  value={selectedStudent.rollNo}
-                  onChange={(e) => setSelectedStudent(prev => prev ? ({ ...prev, rollNo: e.target.value }) : null)}
-                  placeholder="Enter roll number"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-batch">Batch</Label>
-                <Select value={selectedStudent.batch} onValueChange={(value) => setSelectedStudent(prev => prev ? ({ ...prev, batch: value }) : null)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select batch" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover">
-                    <SelectItem value="2023">Batch 2023</SelectItem>
-                    <SelectItem value="2024">Batch 2024</SelectItem>
-                    <SelectItem value="2025">Batch 2025</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-department">Department</Label>
-                <Input
-                  id="edit-department"
-                  value={selectedStudent.department}
-                  onChange={(e) => setSelectedStudent(prev => prev ? ({ ...prev, department: e.target.value }) : null)}
-                  placeholder="Enter department"
                 />
               </div>
               <div className="space-y-2">

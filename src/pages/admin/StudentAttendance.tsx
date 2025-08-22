@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -6,17 +6,29 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Users, Clock, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+
+interface Student {
+  id: string;
+  full_name: string;
+  students: {
+    student_id: string;
+  };
+}
+
+interface Batch {
+  id: string;
+  name: string;
+}
 
 const StudentAttendance = () => {
   const navigate = useNavigate();
   const [selectedBatch, setSelectedBatch] = useState("");
   const [viewType, setViewType] = useState("");
-
-  const batches = [
-    { value: "2023", label: "Batch 2023" },
-    { value: "2024", label: "Batch 2024" },
-    { value: "2025", label: "Batch 2025" },
-  ];
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const viewTypes = [
     { value: "day", label: "Day View" },
@@ -24,14 +36,61 @@ const StudentAttendance = () => {
     { value: "month", label: "Month View" },
   ];
 
-  // Mock student data
-  const students = [
-    { id: 1, name: "John Smith", rollNo: "2024001" },
-    { id: 2, name: "Emma Johnson", rollNo: "2024002" },
-    { id: 3, name: "Michael Brown", rollNo: "2024003" },
-    { id: 4, name: "Sarah Wilson", rollNo: "2024004" },
-    { id: 5, name: "David Lee", rollNo: "2024005" },
-  ];
+  useEffect(() => {
+    fetchBatches();
+  }, []);
+
+  useEffect(() => {
+    if (selectedBatch) {
+      fetchStudents();
+    }
+  }, [selectedBatch]);
+
+  const fetchBatches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('batches')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      setBatches(data || []);
+    } catch (error) {
+      console.error('Error fetching batches:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch batches",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStudents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          full_name,
+          students!inner (
+            student_id
+          )
+        `)
+        .eq('students.batch_id', selectedBatch);
+
+      if (error) throw error;
+      setStudents(data || []);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch students",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Generate dates based on view type
   const generateDates = () => {
@@ -63,12 +122,46 @@ const StudentAttendance = () => {
   const dates = generateDates();
   const [attendance, setAttendance] = useState<Record<string, boolean>>({});
 
-  const handleAttendanceToggle = (studentId: number, date: string) => {
+  const handleAttendanceToggle = (studentId: string, date: string) => {
     const key = `${studentId}-${date}`;
     setAttendance(prev => ({
       ...prev,
       [key]: !prev[key]
     }));
+  };
+
+  const saveAttendance = async () => {
+    try {
+      const attendanceRecords = Object.entries(attendance).map(([key, isPresent]) => {
+        const [studentId, dateStr] = key.split('-');
+        return {
+          student_id: studentId,
+          status: (isPresent ? 'present' : 'absent') as 'present' | 'absent' | 'late',
+          check_in_time: new Date(`${dateStr} 09:00:00`).toISOString(),
+          session_id: null, // Can be linked to a session later
+        };
+      });
+
+      const { error } = await supabase
+        .from('attendance')
+        .upsert(attendanceRecords, {
+          onConflict: 'student_id,session_id'
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Attendance saved successfully",
+      });
+    } catch (error: any) {
+      console.error('Error saving attendance:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save attendance",
+        variant: "destructive",
+      });
+    }
   };
 
   const formatDate = (date: Date) => {
@@ -116,22 +209,22 @@ const StudentAttendance = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <label className="text-sm font-medium mb-2 block">Select Batch</label>
-              <Select value={selectedBatch} onValueChange={setSelectedBatch}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose batch" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover">
-                  {batches.map((batch) => (
-                    <SelectItem key={batch.value} value={batch.value}>
-                      {batch.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <label className="text-sm font-medium mb-2 block">Select Batch</label>
+                <Select value={selectedBatch} onValueChange={setSelectedBatch}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose batch" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover">
+                    {batches.map((batch) => (
+                      <SelectItem key={batch.id} value={batch.id}>
+                        {batch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             
             <div className="flex-1">
               <label className="text-sm font-medium mb-2 block">View Type</label>
@@ -156,7 +249,7 @@ const StudentAttendance = () => {
         <Card className="border-border/50">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              <span>Attendance Table - {selectedBatch}</span>
+              <span>Attendance Table - {batches.find(b => b.id === selectedBatch)?.name}</span>
               <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
                 {viewType.charAt(0).toUpperCase() + viewType.slice(1)} View
               </Badge>
@@ -168,7 +261,7 @@ const StudentAttendance = () => {
                 <thead>
                   <tr className="border-b border-border">
                     <th className="text-left p-3 font-medium text-foreground">Student</th>
-                    <th className="text-left p-3 font-medium text-foreground">Roll No</th>
+                    <th className="text-left p-3 font-medium text-foreground">Student ID</th>
                     {dates.map((date) => (
                       <th key={date.toISOString()} className="text-center p-3 font-medium text-foreground">
                         <div className="flex flex-col items-center gap-1">
@@ -184,31 +277,31 @@ const StudentAttendance = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {students.map((student) => (
-                    <tr key={student.id} className="border-b border-border/50 hover:bg-muted/30">
-                      <td className="p-3 font-medium text-foreground">{student.name}</td>
-                      <td className="p-3 text-muted-foreground">{student.rollNo}</td>
+                   {students.map((student) => (
+                     <tr key={student.id} className="border-b border-border/50 hover:bg-muted/30">
+                       <td className="p-3 font-medium text-foreground">{student.full_name}</td>
+                       <td className="p-3 text-muted-foreground">{student.students?.student_id || '-'}</td>
                       {dates.map((date) => {
                         const dateStr = formatDate(date);
                         const key = `${student.id}-${dateStr}`;
                         const isPresent = attendance[key] || false;
                         const isFuture = isDateInFuture(date);
                         
-                        return (
-                          <td key={dateStr} className="p-3 text-center">
-                            <div className="flex flex-col items-center gap-2">
-                              <Switch
-                                checked={isPresent}
-                                onCheckedChange={() => handleAttendanceToggle(student.id, dateStr)}
-                                disabled={isFuture}
-                                className="data-[state=checked]:bg-success"
-                              />
-                              <span className={`text-xs ${isPresent ? 'text-success' : 'text-muted-foreground'}`}>
-                                {isFuture ? '-' : (isPresent ? 'Present' : 'Absent')}
-                              </span>
-                            </div>
-                          </td>
-                        );
+                         return (
+                           <td key={dateStr} className="p-3 text-center">
+                             <div className="flex flex-col items-center gap-2">
+                               <Switch
+                                 checked={isPresent}
+                                 onCheckedChange={() => handleAttendanceToggle(student.id, dateStr)}
+                                 disabled={isFuture}
+                                 className="data-[state=checked]:bg-success"
+                               />
+                               <span className={`text-xs ${isPresent ? 'text-success' : 'text-muted-foreground'}`}>
+                                 {isFuture ? '-' : (isPresent ? 'Present' : 'Absent')}
+                               </span>
+                             </div>
+                           </td>
+                         );
                       })}
                     </tr>
                   ))}
@@ -217,7 +310,10 @@ const StudentAttendance = () => {
             </div>
             
             <div className="mt-6 flex justify-end">
-              <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+              <Button 
+                onClick={saveAttendance}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
                 <Clock className="h-4 w-4 mr-2" />
                 Save Attendance
               </Button>
