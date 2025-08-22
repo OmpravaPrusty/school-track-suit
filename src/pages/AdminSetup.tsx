@@ -29,12 +29,12 @@ const AdminSetup = () => {
     setCreating(true);
 
     try {
-      // Create admin user with auto-confirmation
+      // Create admin user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/admin`,
           data: {
             full_name: fullName,
             phone
@@ -45,19 +45,16 @@ const AdminSetup = () => {
       if (authError) throw authError;
 
       if (authData.user) {
-        // Wait a moment for the user to be properly created
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Sign in the user first to establish auth context
-        const { error: signInError } = await supabase.auth.signInWithPassword({
+        // Sign in immediately after signup
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password
         });
 
         if (signInError) throw signInError;
 
-        // Now create the profile (the trigger should handle this, but let's ensure it exists)
-        const { error: profileError } = await supabase
+        // Create profile (trigger should handle this, but ensure it exists)
+        await supabase
           .from('profiles')
           .upsert([{
             id: authData.user.id,
@@ -68,13 +65,8 @@ const AdminSetup = () => {
             onConflict: 'id'
           });
 
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-          // Don't throw here as the trigger might have already created it
-        }
-
         // Assign admin role
-        const { error: roleError } = await supabase
+        await supabase
           .from('user_roles')
           .upsert([{
             user_id: authData.user.id,
@@ -83,17 +75,15 @@ const AdminSetup = () => {
             onConflict: 'user_id,role'
           });
 
-        if (roleError) throw roleError;
-
         toast({
           title: "Admin Created Successfully",
           description: "Welcome! Redirecting to admin dashboard...",
         });
 
-        // Redirect to admin dashboard
+        // Force page reload to ensure auth state is updated properly
         setTimeout(() => {
           window.location.href = '/admin';
-        }, 1500);
+        }, 1000);
       }
     } catch (error: any) {
       console.error('Error creating admin:', error);

@@ -15,21 +15,24 @@ const Index = () => {
         // Redirect authenticated users to their dashboard
         switch (role) {
           case "admin":
-            navigate("/admin");
+            navigate("/admin", { replace: true });
             break;
           case "school_admin":
-            navigate("/school-admin");
+            navigate("/school-admin", { replace: true });
             break;
           case "teacher":
-            navigate("/teacher");
+            navigate("/teacher", { replace: true });
             break;
           case "sme":
-            navigate("/sme");
+            navigate("/sme", { replace: true });
             break;
           case "student":
-            navigate("/student");
+            navigate("/student", { replace: true });
             break;
         }
+      }).catch(error => {
+        console.error('Error getting user role:', error);
+        // If there's an error getting role, stay on index page
       });
     }
   }, [user, getUserRole, navigate]);
