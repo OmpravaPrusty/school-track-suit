@@ -1,464 +1,450 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { GraduationCap, Plus, Edit, Trash2, Search } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Edit, Trash2, Search, Users } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { Textarea } from "@/components/ui/textarea";
 
 interface SME {
-  id: number;
-  name: string;
+  id: string;
+  full_name: string;
   email: string;
-  employeeId: string;
-  department: string;
   phone: string;
-  experience: string;
   specialization: string;
+  bio: string;
+  experience_years: number;
   status: "active" | "inactive";
 }
 
 const SMEManagement = () => {
+  const [smes, setSMEs] = useState<SME[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedSME, setSelectedSME] = useState<SME | null>(null);
-  const [newSME, setNewSME] = useState({
-    name: "",
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingSME, setEditingSME] = useState<SME | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [formData, setFormData] = useState({
+    full_name: "",
     email: "",
-    employeeId: "",
-    department: "",
     phone: "",
-    experience: "",
     specialization: "",
+    bio: "",
+    experience_years: "",
+    password: "",
   });
 
-  // Mock SME data
-  const [smeList, setSMEList] = useState<SME[]>([
-    {
-      id: 1,
-      name: "Dr. Alice Cooper",
-      email: "alice.cooper@university.edu",
-      employeeId: "SME001",
-      department: "Computer Science",
-      phone: "+1 (555) 111-2222",
-      experience: "15 years",
-      specialization: "Machine Learning",
-      status: "active",
-    },
-    {
-      id: 2,
-      name: "Prof. Robert Martinez",
-      email: "robert.martinez@university.edu",
-      employeeId: "SME002",
-      department: "Mathematics",
-      phone: "+1 (555) 222-3333",
-      experience: "12 years",
-      specialization: "Applied Mathematics",
-      status: "active",
-    },
-    {
-      id: 3,
-      name: "Dr. Jennifer Wong",
-      email: "jennifer.wong@university.edu",
-      employeeId: "SME003",
-      department: "Physics",
-      phone: "+1 (555) 333-4444",
-      experience: "8 years",
-      specialization: "Quantum Physics",
-      status: "inactive",
-    },
-    {
-      id: 4,
-      name: "Prof. David Kumar",
-      email: "david.kumar@university.edu",
-      employeeId: "SME004",
-      department: "Chemistry",
-      phone: "+1 (555) 444-5555",
-      experience: "20 years",
-      specialization: "Organic Chemistry",
-      status: "active",
-    },
-  ]);
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-  const filteredSMEs = smeList.filter(sme =>
-    sme.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    sme.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    sme.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    sme.department.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const generateRandomPassword = () => {
+    return Math.random().toString(36).slice(-8);
+  };
 
-  const handleAddSME = () => {
-    if (!newSME.name || !newSME.email || !newSME.employeeId) {
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch SMEs with their profiles
+      const { data: smesData, error: smesError } = await supabase
+        .from('smes')
+        .select(`
+          id,
+          specialization,
+          bio,
+          experience_years,
+          profiles!inner (
+            full_name,
+            email,
+            phone,
+            status
+          )
+        `);
+
+      if (smesError) throw smesError;
+
+      const formattedSMEs = smesData?.map(sme => ({
+        id: sme.id,
+        full_name: sme.profiles.full_name,
+        email: sme.profiles.email,
+        phone: sme.profiles.phone || '',
+        specialization: sme.specialization || '',
+        bio: sme.bio || '',
+        experience_years: sme.experience_years || 0,
+        status: sme.profiles.status as "active" | "inactive",
+      })) || [];
+
+      setSMEs(formattedSMEs);
+    } catch (error) {
+      console.error('Error fetching data:', error);
       toast({
-        title: "Missing Information",
+        title: "Error",
+        description: "Failed to fetch data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.full_name || !formData.email || !formData.specialization) {
+      toast({
+        title: "Error",
         description: "Please fill in all required fields",
         variant: "destructive",
       });
       return;
     }
 
-    const sme: SME = {
-      id: smeList.length + 1,
-      ...newSME,
-      status: "active",
-    };
+    try {
+      if (editingSME) {
+        // Update existing SME
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            full_name: formData.full_name,
+            phone: formData.phone,
+          })
+          .eq('id', editingSME.id);
 
-    setSMEList(prev => [...prev, sme]);
-    setNewSME({
-      name: "",
+        if (profileError) throw profileError;
+
+        const { error: smeError } = await supabase
+          .from('smes')
+          .update({
+            specialization: formData.specialization,
+            bio: formData.bio,
+            experience_years: parseInt(formData.experience_years) || 0,
+          })
+          .eq('id', editingSME.id);
+
+        if (smeError) throw smeError;
+
+        toast({
+          title: "Success",
+          description: "SME updated successfully",
+        });
+      } else {
+        // Create new SME
+        const password = formData.password || generateRandomPassword();
+
+        // Create user in Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: formData.email,
+          password: password,
+          options: {
+            data: {
+              full_name: formData.full_name,
+              phone: formData.phone,
+            }
+          }
+        });
+
+        if (authError) throw authError;
+        if (!authData.user) throw new Error('Failed to create user');
+
+        // Insert SME record
+        const { error: smeError } = await supabase
+          .from('smes')
+          .insert({
+            id: authData.user.id,
+            specialization: formData.specialization,
+            bio: formData.bio,
+            experience_years: parseInt(formData.experience_years) || 0,
+          });
+
+        if (smeError) throw smeError;
+
+        // Assign SME role
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({
+            user_id: authData.user.id,
+            role: 'sme',
+          });
+
+        if (roleError) throw roleError;
+
+        toast({
+          title: "Success",
+          description: `SME created successfully. Password: ${password}`,
+        });
+      }
+
+      resetForm();
+      fetchData(); // Refresh the data
+    } catch (error: any) {
+      console.error('Error creating SME:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create SME",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      full_name: "",
       email: "",
-      employeeId: "",
-      department: "",
       phone: "",
-      experience: "",
       specialization: "",
+      bio: "",
+      experience_years: "",
+      password: "",
     });
-    setIsAddDialogOpen(false);
-    
-    toast({
-      title: "SME Added",
-      description: `${sme.name} has been successfully added`,
-    });
+    setEditingSME(null);
+    setIsDialogOpen(false);
   };
 
-  const handleEditSME = () => {
-    if (!selectedSME) return;
+  const handleEdit = (sme: SME) => {
+    setEditingSME(sme);
+    setFormData({
+      full_name: sme.full_name,
+      email: sme.email,
+      phone: sme.phone,
+      specialization: sme.specialization,
+      bio: sme.bio,
+      experience_years: sme.experience_years.toString(),
+      password: "",
+    });
+    setIsDialogOpen(true);
+  };
 
-    setSMEList(prev =>
-      prev.map(sme =>
-        sme.id === selectedSME.id ? selectedSME : sme
-      )
+  const handleDelete = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('smes')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "SME deleted successfully",
+      });
+      
+      fetchData(); // Refresh the data
+    } catch (error: any) {
+      console.error('Error deleting SME:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete SME",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const filteredSMEs = smes.filter(sme =>
+    sme.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    sme.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    sme.specialization.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
     );
-
-    setIsEditDialogOpen(false);
-    setSelectedSME(null);
-    
-    toast({
-      title: "SME Updated",
-      description: "SME information has been successfully updated",
-    });
-  };
-
-  const handleDeleteSME = (id: number) => {
-    const sme = smeList.find(s => s.id === id);
-    setSMEList(prev => prev.filter(s => s.id !== id));
-    
-    toast({
-      title: "SME Deleted",
-      description: `${sme?.name} has been removed from the system`,
-    });
-  };
-
-  const openEditDialog = (sme: SME) => {
-    setSelectedSME({ ...sme });
-    setIsEditDialogOpen(true);
-  };
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <div className="p-3 rounded-lg bg-secondary/10">
-          <GraduationCap className="h-6 w-6 text-secondary" />
+          <Users className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">SME Management</h1>
-          <p className="text-muted-foreground">Manage Subject Matter Expert records and information</p>
+          <h1 className="text-3xl font-bold text-foreground">SME Management</h1>
+          <p className="text-muted-foreground">Manage Subject Matter Experts and their expertise areas</p>
         </div>
       </div>
 
-      <Card className="border-border/50">
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <CardTitle>SME Directory</CardTitle>
-            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              <div className="relative flex-1 sm:w-64">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search SMEs..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-secondary text-secondary-foreground hover:bg-secondary/90">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add SME
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[600px] bg-card">
-                  <DialogHeader>
-                    <DialogTitle>Add New SME</DialogTitle>
-                    <DialogDescription>
-                      Enter the SME's information below to add them to the system.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid grid-cols-2 gap-4 py-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="add-name">Full Name *</Label>
-                      <Input
-                        id="add-name"
-                        value={newSME.name}
-                        onChange={(e) => setNewSME(prev => ({ ...prev, name: e.target.value }))}
-                        placeholder="Enter full name"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="add-email">Email *</Label>
-                      <Input
-                        id="add-email"
-                        type="email"
-                        value={newSME.email}
-                        onChange={(e) => setNewSME(prev => ({ ...prev, email: e.target.value }))}
-                        placeholder="Enter email address"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="add-employeeid">Employee ID *</Label>
-                      <Input
-                        id="add-employeeid"
-                        value={newSME.employeeId}
-                        onChange={(e) => setNewSME(prev => ({ ...prev, employeeId: e.target.value }))}
-                        placeholder="Enter employee ID"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="add-department">Department</Label>
-                      <Select value={newSME.department} onValueChange={(value) => setNewSME(prev => ({ ...prev, department: value }))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select department" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-popover">
-                          <SelectItem value="Computer Science">Computer Science</SelectItem>
-                          <SelectItem value="Mathematics">Mathematics</SelectItem>
-                          <SelectItem value="Physics">Physics</SelectItem>
-                          <SelectItem value="Chemistry">Chemistry</SelectItem>
-                          <SelectItem value="Biology">Biology</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="add-phone">Phone</Label>
-                      <Input
-                        id="add-phone"
-                        value={newSME.phone}
-                        onChange={(e) => setNewSME(prev => ({ ...prev, phone: e.target.value }))}
-                        placeholder="Enter phone number"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="add-experience">Experience</Label>
-                      <Input
-                        id="add-experience"
-                        value={newSME.experience}
-                        onChange={(e) => setNewSME(prev => ({ ...prev, experience: e.target.value }))}
-                        placeholder="e.g., 10 years"
-                      />
-                    </div>
-                    <div className="col-span-2 space-y-2">
-                      <Label htmlFor="add-specialization">Specialization</Label>
-                      <Input
-                        id="add-specialization"
-                        value={newSME.specialization}
-                        onChange={(e) => setNewSME(prev => ({ ...prev, specialization: e.target.value }))}
-                        placeholder="Enter area of specialization"
-                      />
-                    </div>
+      <div className="flex justify-between items-center">
+        <div className="relative w-96">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search SMEs by name, email, or specialization..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              Add SME
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <form onSubmit={handleSubmit}>
+              <DialogHeader>
+                <DialogTitle>
+                  {editingSME ? "Edit SME" : "Add New SME"}
+                </DialogTitle>
+                <DialogDescription>
+                  Enter SME information and expertise details
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid grid-cols-2 gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="full_name">Full Name *</Label>
+                  <Input
+                    id="full_name"
+                    value={formData.full_name}
+                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                    placeholder="Enter full name"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="Enter email address"
+                    required
+                    disabled={!!editingSME}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="Enter phone number"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="experience_years">Experience (years)</Label>
+                  <Input
+                    id="experience_years"
+                    type="number"
+                    value={formData.experience_years}
+                    onChange={(e) => setFormData({ ...formData, experience_years: e.target.value })}
+                    placeholder="Years of experience"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="specialization">Specialization *</Label>
+                  <Input
+                    id="specialization"
+                    value={formData.specialization}
+                    onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
+                    placeholder="Area of expertise"
+                    required
+                  />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label htmlFor="bio">Bio</Label>
+                  <Textarea
+                    id="bio"
+                    value={formData.bio}
+                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                    placeholder="Brief bio and background"
+                    rows={3}
+                  />
+                </div>
+                {!editingSME && (
+                  <div className="space-y-2 col-span-2">
+                    <Label htmlFor="password">Password (leave empty for auto-generation)</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      placeholder="Enter password or leave empty"
+                    />
                   </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button onClick={handleAddSME} className="bg-secondary text-secondary-foreground">
-                      Add SME
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={resetForm}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  {editingSME ? "Update" : "Add"} SME
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>SME Directory</CardTitle>
+          <CardDescription>Subject Matter Experts and their areas of expertise</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Employee ID</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Experience</TableHead>
-                  <TableHead>Specialization</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSMEs.map((sme) => (
-                  <TableRow key={sme.id} className="hover:bg-muted/30">
-                    <TableCell className="font-medium">{sme.name}</TableCell>
-                    <TableCell>{sme.employeeId}</TableCell>
-                    <TableCell>{sme.email}</TableCell>
-                    <TableCell>{sme.department}</TableCell>
-                    <TableCell>{sme.experience}</TableCell>
-                    <TableCell>{sme.specialization}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={sme.status === "active" ? "default" : "secondary"}
-                        className={sme.status === "active" ? "bg-success text-success-foreground" : ""}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Specialization</TableHead>
+                <TableHead>Experience</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredSMEs.map((sme) => (
+                <TableRow key={sme.id}>
+                  <TableCell className="font-medium">{sme.full_name}</TableCell>
+                  <TableCell>{sme.email}</TableCell>
+                  <TableCell>{sme.phone}</TableCell>
+                  <TableCell>{sme.specialization}</TableCell>
+                  <TableCell>{sme.experience_years} years</TableCell>
+                  <TableCell>
+                    <Badge variant={sme.status === "active" ? "default" : "secondary"}>
+                      {sme.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleEdit(sme)}
                       >
-                        {sme.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEditDialog(sme)}
-                          className="hover:bg-accent"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteSME(sme.id)}
-                          className="hover:bg-destructive hover:text-destructive-foreground"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleDelete(sme.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
           {filteredSMEs.length === 0 && (
-            <div className="text-center py-8">
-              <GraduationCap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No SMEs found matching your search.</p>
+            <div className="text-center py-8 text-muted-foreground">
+              No SMEs found
             </div>
           )}
         </CardContent>
       </Card>
-
-      {/* Edit SME Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] bg-card">
-          <DialogHeader>
-            <DialogTitle>Edit SME</DialogTitle>
-            <DialogDescription>
-              Update the SME's information below.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedSME && (
-            <div className="grid grid-cols-2 gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-name">Full Name *</Label>
-                <Input
-                  id="edit-name"
-                  value={selectedSME.name}
-                  onChange={(e) => setSelectedSME(prev => prev ? ({ ...prev, name: e.target.value }) : null)}
-                  placeholder="Enter full name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-email">Email *</Label>
-                <Input
-                  id="edit-email"
-                  type="email"
-                  value={selectedSME.email}
-                  onChange={(e) => setSelectedSME(prev => prev ? ({ ...prev, email: e.target.value }) : null)}
-                  placeholder="Enter email address"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-employeeid">Employee ID *</Label>
-                <Input
-                  id="edit-employeeid"
-                  value={selectedSME.employeeId}
-                  onChange={(e) => setSelectedSME(prev => prev ? ({ ...prev, employeeId: e.target.value }) : null)}
-                  placeholder="Enter employee ID"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-department">Department</Label>
-                <Select value={selectedSME.department} onValueChange={(value) => setSelectedSME(prev => prev ? ({ ...prev, department: value }) : null)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select department" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover">
-                    <SelectItem value="Computer Science">Computer Science</SelectItem>
-                    <SelectItem value="Mathematics">Mathematics</SelectItem>
-                    <SelectItem value="Physics">Physics</SelectItem>
-                    <SelectItem value="Chemistry">Chemistry</SelectItem>
-                    <SelectItem value="Biology">Biology</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-phone">Phone</Label>
-                <Input
-                  id="edit-phone"
-                  value={selectedSME.phone}
-                  onChange={(e) => setSelectedSME(prev => prev ? ({ ...prev, phone: e.target.value }) : null)}
-                  placeholder="Enter phone number"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-experience">Experience</Label>
-                <Input
-                  id="edit-experience"
-                  value={selectedSME.experience}
-                  onChange={(e) => setSelectedSME(prev => prev ? ({ ...prev, experience: e.target.value }) : null)}
-                  placeholder="e.g., 10 years"
-                />
-              </div>
-              <div className="col-span-2 space-y-2">
-                <Label htmlFor="edit-specialization">Specialization</Label>
-                <Input
-                  id="edit-specialization"
-                  value={selectedSME.specialization}
-                  onChange={(e) => setSelectedSME(prev => prev ? ({ ...prev, specialization: e.target.value }) : null)}
-                  placeholder="Enter area of specialization"
-                />
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleEditSME} className="bg-secondary text-secondary-foreground">
-              Update SME
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

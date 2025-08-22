@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,76 +9,114 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Edit, Trash2, Search } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Teacher {
   id: string;
-  name: string;
+  full_name: string;
   email: string;
   phone: string;
-  subject: string;
-  organization: string;
-  school: string;
-  experience: string;
+  specialization: string;
+  school_name: string;
+  school_id: string;
+  employee_id: string;
   status: "active" | "inactive";
 }
 
-// const mockOrganizations = ["Tech University", "Science Academy", "Arts Institute"];
-const mockSchools = ["Malanad Higher Secondary School", "St. Mary's Convent School", "Bharatiya Vidya Bhavan School"];
+interface School {
+  id: string;
+  name: string;
+}
 
 const TeacherManagement = () => {
-  const [teachers, setTeachers] = useState<Teacher[]>([
-    {
-      id: "1",
-      name: "Rajesh Kumar",
-      email: "rajesh.kumar@malanada.edu.in",
-      phone: "+91-9876543210",
-      subject: "Mathematics",
-      organization: "", // Commented out
-      school: "Malanad Higher Secondary School",
-      experience: "5 years",
-      status: "active",
-    },
-    {
-      id: "2",
-      name: "Priya Nair",
-      email: "priya.nair@stmarys.edu.in",
-      phone: "+91-8765432109",
-      subject: "Physics",
-      organization: "", // Commented out
-      school: "St. Mary's Convent School",
-      experience: "8 years",
-      status: "active",
-    },
-    {
-      id: "3",
-      name: "Arjun Menon",
-      email: "arjun.menon@bvb.edu.in",
-      phone: "+91-7654321098",
-      subject: "Chemistry",
-      organization: "", // Commented out
-      school: "Bharatiya Vidya Bhavan School",
-      experience: "3 years",
-      status: "active",
-    },
-  ]);
-
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [schools, setSchools] = useState<School[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
-    name: "",
+    full_name: "",
     email: "",
     phone: "",
-    subject: "",
-    organization: "",
-    school: "",
-    experience: "",
+    specialization: "",
+    school_id: "",
+    employee_id: "",
+    password: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const generateRandomPassword = () => {
+    return Math.random().toString(36).slice(-8);
+  };
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch teachers with their profiles and school information
+      const { data: teachersData, error: teachersError } = await supabase
+        .from('teachers')
+        .select(`
+          id,
+          employee_id,
+          specialization,
+          hire_date,
+          school_id,
+          profiles!inner (
+            full_name,
+            email,
+            phone,
+            status
+          ),
+          schools (
+            name
+          )
+        `);
+
+      if (teachersError) throw teachersError;
+
+      // Fetch schools
+      const { data: schoolsData, error: schoolsError } = await supabase
+        .from('schools')
+        .select('id, name')
+        .order('name');
+
+      if (schoolsError) throw schoolsError;
+
+      const formattedTeachers = teachersData?.map(teacher => ({
+        id: teacher.id,
+        full_name: teacher.profiles.full_name,
+        email: teacher.profiles.email,
+        phone: teacher.profiles.phone || '',
+        specialization: teacher.specialization || '',
+        school_name: teacher.schools?.name || '',
+        school_id: teacher.school_id || '',
+        employee_id: teacher.employee_id || '',
+        status: teacher.profiles.status as "active" | "inactive",
+      })) || [];
+
+      setTeachers(formattedTeachers);
+      setSchools(schoolsData || []);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.email || !formData.school) {
+    if (!formData.full_name || !formData.email || !formData.school_id) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -87,41 +125,102 @@ const TeacherManagement = () => {
       return;
     }
 
-    if (editingTeacher) {
-      setTeachers(teachers.map(teacher =>
-        teacher.id === editingTeacher.id
-          ? { ...teacher, ...formData }
-          : teacher
-      ));
+    try {
+      if (editingTeacher) {
+        // Update existing teacher
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            full_name: formData.full_name,
+            phone: formData.phone,
+          })
+          .eq('id', editingTeacher.id);
+
+        if (profileError) throw profileError;
+
+        const { error: teacherError } = await supabase
+          .from('teachers')
+          .update({
+            employee_id: formData.employee_id,
+            specialization: formData.specialization,
+            school_id: formData.school_id,
+          })
+          .eq('id', editingTeacher.id);
+
+        if (teacherError) throw teacherError;
+
+        toast({
+          title: "Success",
+          description: "Teacher updated successfully",
+        });
+      } else {
+        // Create new teacher
+        const password = formData.password || generateRandomPassword();
+
+        // Create user in Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: formData.email,
+          password: password,
+          options: {
+            data: {
+              full_name: formData.full_name,
+              phone: formData.phone,
+            }
+          }
+        });
+
+        if (authError) throw authError;
+        if (!authData.user) throw new Error('Failed to create user');
+
+        // Insert teacher record
+        const { error: teacherError } = await supabase
+          .from('teachers')
+          .insert({
+            id: authData.user.id,
+            employee_id: formData.employee_id,
+            specialization: formData.specialization,
+            school_id: formData.school_id,
+          });
+
+        if (teacherError) throw teacherError;
+
+        // Assign teacher role
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({
+            user_id: authData.user.id,
+            role: 'teacher',
+          });
+
+        if (roleError) throw roleError;
+
+        toast({
+          title: "Success",
+          description: `Teacher created successfully. Password: ${password}`,
+        });
+      }
+
+      resetForm();
+      fetchData(); // Refresh the data
+    } catch (error: any) {
+      console.error('Error creating teacher:', error);
       toast({
-        title: "Success",
-        description: "Teacher updated successfully",
-      });
-    } else {
-      const newTeacher: Teacher = {
-        id: Date.now().toString(),
-        ...formData,
-        status: "active",
-      };
-      setTeachers([...teachers, newTeacher]);
-      toast({
-        title: "Success",
-        description: "Teacher added successfully",
+        title: "Error",
+        description: error.message || "Failed to create teacher",
+        variant: "destructive",
       });
     }
-
-    resetForm();
   };
 
   const resetForm = () => {
     setFormData({
-      name: "",
+      full_name: "",
       email: "",
       phone: "",
-      subject: "",
-      organization: "",
-      school: "",
-      experience: "",
+      specialization: "",
+      school_id: "",
+      employee_id: "",
+      password: "",
     });
     setEditingTeacher(null);
     setIsDialogOpen(false);
@@ -130,34 +229,55 @@ const TeacherManagement = () => {
   const handleEdit = (teacher: Teacher) => {
     setEditingTeacher(teacher);
     setFormData({
-      name: teacher.name,
+      full_name: teacher.full_name,
       email: teacher.email,
       phone: teacher.phone,
-      subject: teacher.subject,
-      organization: teacher.organization,
-      school: teacher.school,
-      experience: teacher.experience,
+      specialization: teacher.specialization,
+      school_id: teacher.school_id,
+      employee_id: teacher.employee_id,
+      password: "",
     });
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setTeachers(teachers.filter(teacher => teacher.id !== id));
-    toast({
-      title: "Success",
-      description: "Teacher deleted successfully",
-    });
+  const handleDelete = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('teachers')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Teacher deleted successfully",
+      });
+      
+      fetchData(); // Refresh the data
+    } catch (error: any) {
+      console.error('Error deleting teacher:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete teacher",
+        variant: "destructive",
+      });
+    }
   };
 
   const filteredTeachers = teachers.filter(teacher =>
-    teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    teacher.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     teacher.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    teacher.subject.toLowerCase().includes(searchTerm.toLowerCase())
+    teacher.specialization.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // const availableSchools = formData.organization 
-  //   ? mockSchools[formData.organization as keyof typeof mockSchools] || []
-  //   : [];
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -185,12 +305,13 @@ const TeacherManagement = () => {
               </DialogHeader>
               <div className="grid grid-cols-2 gap-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Name *</Label>
+                  <Label htmlFor="full_name">Full Name *</Label>
                   <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Teacher name"
+                    id="full_name"
+                    value={formData.full_name}
+                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                    placeholder="Enter full name"
+                    required
                   />
                 </div>
                 <div className="space-y-2">
@@ -200,68 +321,68 @@ const TeacherManagement = () => {
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="teacher@example.com"
+                    placeholder="Enter email address"
+                    required
+                    disabled={!!editingTeacher}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
+                  <Label htmlFor="phone">Phone Number</Label>
                   <Input
                     id="phone"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="+1234567890"
+                    placeholder="Enter phone number"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="subject">Subject</Label>
+                  <Label htmlFor="employee_id">Employee ID</Label>
                   <Input
-                    id="subject"
-                    value={formData.subject}
-                    onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                    placeholder="Subject taught"
+                    id="employee_id"
+                    value={formData.employee_id}
+                    onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
+                    placeholder="Enter employee ID"
                   />
                 </div>
-                {/* <div className="space-y-2">
-                  <Label htmlFor="organization">Organization *</Label>
-                  <Select 
-                    value={formData.organization} 
-                    onValueChange={(value) => setFormData({ ...formData, organization: value, school: "" })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select organization" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {mockOrganizations.map((org) => (
-                        <SelectItem key={org} value={org}>{org}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div> */}
                 <div className="space-y-2">
-                  <Label htmlFor="school">School *</Label>
-                  <Select 
-                    value={formData.school} 
-                    onValueChange={(value) => setFormData({ ...formData, school: value })}
+                  <Label htmlFor="specialization">Subject/Specialization</Label>
+                  <Input
+                    id="specialization"
+                    value={formData.specialization}
+                    onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
+                    placeholder="Enter subject area"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="school_id">School *</Label>
+                  <Select
+                    value={formData.school_id}
+                    onValueChange={(value) => setFormData({ ...formData, school_id: value })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select school" />
+                      <SelectValue placeholder="Select a school" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockSchools.map((school) => (
-                        <SelectItem key={school} value={school}>{school}</SelectItem>
+                      {schools.map((school) => (
+                        <SelectItem key={school.id} value={school.id}>
+                          {school.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2 col-span-2">
-                  <Label htmlFor="experience">Experience</Label>
-                  <Input
-                    id="experience"
-                    value={formData.experience}
-                    onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
-                    placeholder="e.g., 5 years"
-                  />
-                </div>
+                {!editingTeacher && (
+                  <div className="space-y-2 col-span-2">
+                    <Label htmlFor="password">Password (leave empty for auto-generation)</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      placeholder="Enter password or leave empty"
+                    />
+                  </div>
+                )}
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={resetForm}>
@@ -298,9 +419,10 @@ const TeacherManagement = () => {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Subject</TableHead>
-                {/* <TableHead>Organization</TableHead> */}
+                <TableHead>Phone</TableHead>
+                <TableHead>Specialization</TableHead>
                 <TableHead>School</TableHead>
+                <TableHead>Employee ID</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -308,11 +430,12 @@ const TeacherManagement = () => {
             <TableBody>
               {filteredTeachers.map((teacher) => (
                 <TableRow key={teacher.id}>
-                  <TableCell className="font-medium">{teacher.name}</TableCell>
+                  <TableCell className="font-medium">{teacher.full_name}</TableCell>
                   <TableCell>{teacher.email}</TableCell>
-                  <TableCell>{teacher.subject}</TableCell>
-                  {/* <TableCell>{teacher.organization}</TableCell> */}
-                  <TableCell>{teacher.school}</TableCell>
+                  <TableCell>{teacher.phone}</TableCell>
+                  <TableCell>{teacher.specialization}</TableCell>
+                  <TableCell>{teacher.school_name}</TableCell>
+                  <TableCell>{teacher.employee_id}</TableCell>
                   <TableCell>
                     <Badge variant={teacher.status === "active" ? "default" : "secondary"}>
                       {teacher.status}
@@ -340,6 +463,11 @@ const TeacherManagement = () => {
               ))}
             </TableBody>
           </Table>
+          {filteredTeachers.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              No teachers found
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
