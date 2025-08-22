@@ -29,7 +29,7 @@ const AdminSetup = () => {
     setCreating(true);
 
     try {
-      // Create admin user
+      // Create admin user with auto-confirmation
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -45,35 +45,55 @@ const AdminSetup = () => {
       if (authError) throw authError;
 
       if (authData.user) {
-        // Create profile
+        // Wait a moment for the user to be properly created
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Sign in the user first to establish auth context
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        if (signInError) throw signInError;
+
+        // Now create the profile (the trigger should handle this, but let's ensure it exists)
         const { error: profileError } = await supabase
           .from('profiles')
-          .insert([{
+          .upsert([{
             id: authData.user.id,
             email,
             full_name: fullName,
             phone: phone || null
-          }]);
+          }], { 
+            onConflict: 'id'
+          });
 
-        if (profileError) throw profileError;
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+          // Don't throw here as the trigger might have already created it
+        }
 
         // Assign admin role
         const { error: roleError } = await supabase
           .from('user_roles')
-          .insert([{
+          .upsert([{
             user_id: authData.user.id,
             role: 'admin' as const
-          }]);
+          }], {
+            onConflict: 'user_id,role'
+          });
 
         if (roleError) throw roleError;
 
         toast({
           title: "Admin Created Successfully",
-          description: "You can now sign in with your admin credentials",
+          description: "Welcome! Redirecting to admin dashboard...",
         });
 
-        // Redirect to sign in
-        window.location.href = '/auth';
+        // Redirect to admin dashboard
+        setTimeout(() => {
+          window.location.href = '/admin';
+        }, 1500);
       }
     } catch (error: any) {
       console.error('Error creating admin:', error);
