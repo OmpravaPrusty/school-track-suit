@@ -1,11 +1,26 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Calendar, BookOpen, Users, Video, Clock, CheckCircle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Calendar, BookOpen, Users, Video, CheckCircle, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 const SMEDashboardHome = () => {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">My Attendance</CardTitle>
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">View Report</div>
+            <p className="text-xs text-muted-foreground">Check your monthly attendance</p>
+            <Button asChild variant="link" className="px-0 pt-2">
+              <Link to="/sme/attendance">View Details <ArrowRight className="h-4 w-4 ml-2" /></Link>
+            </Button>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Sessions Delivered</CardTitle>
@@ -36,17 +51,6 @@ const SMEDashboardHome = () => {
           <CardContent>
             <div className="text-2xl font-bold">6</div>
             <p className="text-xs text-muted-foreground">This week</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Specialization</CardTitle>
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">AI/ML</div>
-            <p className="text-xs text-muted-foreground">Machine Learning</p>
           </CardContent>
         </Card>
       </div>

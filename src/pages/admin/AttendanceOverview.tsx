@@ -1,11 +1,67 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FolderOpen, Users, GraduationCap } from "lucide-react";
+import { FolderOpen, Users, GraduationCap, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { format } from 'date-fns';
 
 const AttendanceOverview = () => {
   const navigate = useNavigate();
+  const [stats, setStats] = useState({
+    totalStudents: 0,
+    totalSMEs: 0,
+    todayAttendance: 0,
+  });
+  const [loadingStats, setLoadingStats] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoadingStats(true);
+
+        // Fetch total students
+        const { count: studentCount, error: studentError } = await supabase
+          .from('students')
+          .select('*', { count: 'exact', head: true });
+
+        if (studentError) throw studentError;
+
+        // Fetch total SMEs
+        const { count: smeCount, error: smeError } = await supabase
+          .from('smes')
+          .select('*', { count: 'exact', head: true });
+
+        if (smeError) throw smeError;
+
+        // Fetch today's attendance
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const { data: attendanceData, error: attendanceError } = await supabase
+          .from('attendance')
+          .select('status')
+          .eq('attendance_date', today);
+
+        if (attendanceError) throw attendanceError;
+
+        const presentCount = attendanceData.filter(a => a.status === 'present').length;
+        const totalToday = attendanceData.length;
+        const attendancePercentage = totalToday > 0 ? (presentCount / totalToday) * 100 : 0;
+
+        setStats({
+          totalStudents: studentCount || 0,
+          totalSMEs: smeCount || 0,
+          todayAttendance: attendancePercentage,
+        });
+
+      } catch (error) {
+        console.error("Failed to fetch dashboard stats:", error);
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   const attendanceCategories = [
     {
@@ -33,7 +89,7 @@ const AttendanceOverview = () => {
           <FolderOpen className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Attendance Management</h1>
+          <h1 className="text-2xl font-bold text-foreground">SANKALP 90 Attendance Management</h1>
           <p className="text-muted-foreground">Select a category to manage attendance records</p>
         </div>
       </div>
@@ -77,7 +133,7 @@ const AttendanceOverview = () => {
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Students</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">1,247</div>
+            {loadingStats ? <Loader2 className="h-6 w-6 animate-spin" /> : <div className="text-2xl font-bold text-primary">{stats.totalStudents}</div>}
             <p className="text-xs text-muted-foreground">Across all batches</p>
           </CardContent>
         </Card>
@@ -87,7 +143,7 @@ const AttendanceOverview = () => {
             <CardTitle className="text-sm font-medium text-muted-foreground">Active SMEs</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-secondary">89</div>
+            {loadingStats ? <Loader2 className="h-6 w-6 animate-spin" /> : <div className="text-2xl font-bold text-secondary">{stats.totalSMEs}</div>}
             <p className="text-xs text-muted-foreground">Subject Matter Experts</p>
           </CardContent>
         </Card>
@@ -97,7 +153,7 @@ const AttendanceOverview = () => {
             <CardTitle className="text-sm font-medium text-muted-foreground">Today's Attendance</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">94.2%</div>
+            {loadingStats ? <Loader2 className="h-6 w-6 animate-spin" /> : <div className="text-2xl font-bold text-success">{stats.todayAttendance.toFixed(1)}%</div>}
             <p className="text-xs text-muted-foreground">Overall attendance rate</p>
           </CardContent>
         </Card>

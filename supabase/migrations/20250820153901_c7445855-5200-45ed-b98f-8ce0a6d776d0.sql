@@ -1,8 +1,19 @@
 -- Create enum types for roles and statuses
-CREATE TYPE public.app_role AS ENUM ('admin', 'student', 'teacher', 'sme', 'school_admin');
-CREATE TYPE public.user_status AS ENUM ('active', 'inactive', 'suspended');
-CREATE TYPE public.session_status AS ENUM ('scheduled', 'ongoing', 'completed', 'cancelled');
-CREATE TYPE public.attendance_status AS ENUM ('present', 'absent', 'late');
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'app_role') THEN
+        CREATE TYPE public.app_role AS ENUM ('admin', 'student', 'teacher', 'sme', 'school_admin');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_status') THEN
+        CREATE TYPE public.user_status AS ENUM ('active', 'inactive', 'suspended');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'session_status') THEN
+        CREATE TYPE public.session_status AS ENUM ('scheduled', 'ongoing', 'completed', 'cancelled');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'attendance_status') THEN
+        CREATE TYPE public.attendance_status AS ENUM ('present', 'absent', 'late');
+    END IF;
+END$$;
 
 -- Create profiles table
 CREATE TABLE public.profiles (

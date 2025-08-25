@@ -281,21 +281,22 @@ const StudentManagement = () => {
 
   const handleDeleteStudent = async (id: string) => {
     try {
-      // Delete from auth will cascade to other tables
-      const { error } = await supabase.auth.admin.deleteUser(id);
-      
+      const { error } = await supabase.functions.invoke('delete-user', {
+        body: { userId: id },
+      });
+
       if (error) throw error;
-      
-      fetchData();
+
+      fetchData(); // Refresh the data
       toast({
         title: "Student Deleted",
-        description: "Student has been removed from the system",
+        description: "Student has been successfully removed from the system.",
       });
     } catch (error: any) {
       console.error('Error deleting student:', error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete student",
+        title: "Deletion Failed",
+        description: error.message || "An error occurred while deleting the student.",
         variant: "destructive",
       });
     }
@@ -541,10 +542,51 @@ const StudentManagement = () => {
                 <Label htmlFor="edit-phone">Phone</Label>
                 <Input
                   id="edit-phone"
-                  value={selectedStudent.phone}
+                  value={selectedStudent.phone || ''}
                   onChange={(e) => setSelectedStudent(prev => prev ? ({ ...prev, phone: e.target.value }) : null)}
                   placeholder="Enter phone number"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-student-id">Student ID</Label>
+                <Input
+                  id="edit-student-id"
+                  value={selectedStudent.students?.student_id || ''}
+                  onChange={(e) => setSelectedStudent(prev => prev ? ({ ...prev, students: { ...prev.students!, student_id: e.target.value } }) : null)}
+                  placeholder="Enter student ID"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-school">School *</Label>
+                <Select
+                  value={selectedStudent.students?.school_id || ''}
+                  onValueChange={(value) => setSelectedStudent(prev => prev ? ({ ...prev, students: { ...prev.students!, school_id: value } }) : null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select school" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover">
+                    {schools.map((school) => (
+                      <SelectItem key={school.id} value={school.id}>{school.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-batch">Batch</Label>
+                <Select
+                  value={selectedStudent.students?.batch_id || ''}
+                  onValueChange={(value) => setSelectedStudent(prev => prev ? ({ ...prev, students: { ...prev.students!, batch_id: value } }) : null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select batch" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover">
+                    {batches.map((batch) => (
+                      <SelectItem key={batch.id} value={batch.id}>{batch.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           )}

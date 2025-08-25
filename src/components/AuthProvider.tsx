@@ -6,10 +6,10 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ user: User | null, error: any }>;
   signUp: (email: string, password: string, role: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
-  getUserRole: () => Promise<string | null>;
+  getUserRole: (userId?: string) => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,11 +48,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    return { error };
+    return { user: data.user, error };
   };
 
   const signUp = async (email: string, password: string, role: string) => {
@@ -75,14 +75,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
   };
 
-  const getUserRole = async (): Promise<string | null> => {
-    if (!user) return null;
+  const getUserRole = async (userId?: string): Promise<string | null> => {
+    const id = userId || user?.id;
+    if (!id) return null;
     
     try {
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.id)
+        .eq('user_id', id)
         .single();
       
       if (error || !data) return null;

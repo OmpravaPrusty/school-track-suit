@@ -77,14 +77,14 @@ const SchoolAdminDashboard = () => {
                 </div>
                 <Badge>Active</Badge>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 border rounded-lg">
                   <h4 className="font-medium">Classes</h4>
                   <p className="text-2xl font-bold">12</p>
                   <p className="text-sm text-muted-foreground">Std 1 to 12</p>
                 </div>
-                
+
                 <div className="p-4 border rounded-lg">
                   <h4 className="font-medium">Sections</h4>
                   <p className="text-2xl font-bold">24</p>
@@ -108,7 +108,7 @@ const SchoolAdminDashboard = () => {
                   <p className="text-sm text-muted-foreground">2 hours ago</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-4 p-4 border rounded-lg">
                 <Clock className="h-8 w-8 text-primary" />
                 <div className="flex-1">
@@ -117,7 +117,7 @@ const SchoolAdminDashboard = () => {
                   <p className="text-sm text-muted-foreground">1 day ago</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-4 p-4 border rounded-lg">
                 <Clock className="h-8 w-8 text-primary" />
                 <div className="flex-1">
@@ -146,7 +146,7 @@ const SchoolAdminDashboard = () => {
                     <Badge>89%</Badge>
                   </div>
                 </div>
-                
+
                 <div className="p-4 border rounded-lg">
                   <h4 className="font-medium">Class 11</h4>
                   <p className="text-sm text-muted-foreground">Students: 95</p>
@@ -156,7 +156,7 @@ const SchoolAdminDashboard = () => {
                     <Badge>85%</Badge>
                   </div>
                 </div>
-                
+
                 <div className="p-4 border rounded-lg">
                   <h4 className="font-medium">Class 12</h4>
                   <p className="text-sm text-muted-foreground">Students: 88</p>

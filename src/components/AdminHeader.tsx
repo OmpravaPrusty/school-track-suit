@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,43 +9,35 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Settings, LogOut, User, Bell } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/components/AuthProvider";
 
 interface AdminHeaderProps {
   title?: string;
   subtitle?: string;
 }
 
-export function AdminHeader({ title = "Educational Management System", subtitle = "Administrator Dashboard" }: AdminHeaderProps) {
+export function AdminHeader({ title = "Ashwakalpam", subtitle = "Administrator Dashboard" }: AdminHeaderProps) {
   const navigate = useNavigate();
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [profileData, setProfileData] = useState({
-    name: "Admin User",
-    email: "admin@school.com",
-    phone: "+1 (555) 123-4567",
-  });
+  const { user, signOut } = useAuth();
 
-  const handleLogout = () => {
-    localStorage.removeItem("userRole");
-    localStorage.removeItem("userEmail");
-    toast({
-      title: "Logged Out",
-      description: "You have been successfully logged out",
-    });
-    navigate("/");
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Logged Out",
+        description: "You have been successfully logged out",
+      });
+      navigate("/auth", { replace: true });
+    } catch (error) {
+      toast({
+        title: "Logout Failed",
+        description: "An error occurred while logging out.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleProfileUpdate = () => {
@@ -80,9 +71,9 @@ export function AdminHeader({ title = "Educational Management System", subtitle 
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                 <Avatar className="h-10 w-10">
-                  <AvatarImage src="/avatars/admin.png" alt="Admin" />
+                  <AvatarImage src={user?.user_metadata?.avatar_url} alt={user?.user_metadata?.full_name || user?.email} />
                   <AvatarFallback className="bg-primary text-primary-foreground">
-                    {profileData.name.split(' ').map(n => n[0]).join('')}
+                    {user?.user_metadata?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase() || user?.email?.[0].toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -90,72 +81,18 @@ export function AdminHeader({ title = "Educational Management System", subtitle 
             <DropdownMenuContent className="w-56 bg-popover" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{profileData.name}</p>
+                  <p className="text-sm font-medium leading-none">{user?.user_metadata?.full_name || "User"}</p>
                   <p className="text-xs leading-none text-muted-foreground">
-                    {profileData.email}
+                    {user?.email}
                   </p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              
-              <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-                <DialogTrigger asChild>
-                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Profile Settings</span>
-                  </DropdownMenuItem>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px] bg-card">
-                  <DialogHeader>
-                    <DialogTitle>Edit Profile</DialogTitle>
-                    <DialogDescription>
-                      Make changes to your profile here. Click save when you're done.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="name" className="text-right">
-                        Name
-                      </Label>
-                      <Input
-                        id="name"
-                        value={profileData.name}
-                        onChange={(e) => setProfileData(prev => ({ ...prev, name: e.target.value }))}
-                        className="col-span-3"
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="email" className="text-right">
-                        Email
-                      </Label>
-                      <Input
-                        id="email"
-                        value={profileData.email}
-                        onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
-                        className="col-span-3"
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="phone" className="text-right">
-                        Phone
-                      </Label>
-                      <Input
-                        id="phone"
-                        value={profileData.phone}
-                        onChange={(e) => setProfileData(prev => ({ ...prev, phone: e.target.value }))}
-                        className="col-span-3"
-                      />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={handleProfileUpdate} className="bg-primary text-primary-foreground">
-                      Save changes
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-
-              <DropdownMenuItem>
+              <DropdownMenuItem disabled>
+                <User className="mr-2 h-4 w-4" />
+                <span>Profile</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled>
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Settings</span>
               </DropdownMenuItem>

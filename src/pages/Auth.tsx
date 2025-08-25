@@ -14,16 +14,7 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { signIn, signUp, user, getUserRole } = useAuth();
-
-  // If user is already authenticated, redirect them
-  useState(() => {
-    if (user) {
-      getUserRole().then(role => {
-        redirectBasedOnRole(role);
-      });
-    }
-  });
+  const { signIn, signUp, getUserRole } = useAuth();
 
   const redirectBasedOnRole = (role: string | null) => {
     switch (role) {
@@ -62,22 +53,22 @@ const Auth = () => {
     setLoading(true);
     
     try {
-      const { error } = await signIn(email, password);
+      const { user, error } = await signIn(email, password);
       
-      if (error) {
+      if (error || !user) {
         toast({
           title: "Login Failed",
-          description: error.message,
+          description: error?.message || "An unknown error occurred.",
           variant: "destructive",
         });
       } else {
         toast({
           title: "Login Successful",
-          description: "Welcome back!",
+          description: "Welcome back! Redirecting...",
         });
         
         // Get user role and redirect
-        const role = await getUserRole();
+        const role = await getUserRole(user.id);
         redirectBasedOnRole(role);
       }
     } catch (error: any) {
@@ -98,47 +89,52 @@ const Auth = () => {
           <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
             <GraduationCap className="h-8 w-8 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold">Education Portal</CardTitle>
+          <CardTitle className="text-2xl font-bold">Ashwakalpam Portal</CardTitle>
           <CardDescription className="text-muted-foreground">
             Sign in to access your dashboard
           </CardDescription>
         </CardHeader>
         
         <Tabs defaultValue="signin" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mx-6">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="signin">Sign In</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
           </TabsList>
           
           <TabsContent value="signin">
             <form onSubmit={handleSignIn}>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 pt-6">
                 <div className="space-y-2">
                   <Label htmlFor="signin-email">Email</Label>
                   <Input
                     id="signin-email"
                     type="email"
-                    placeholder="Enter your email"
+                    placeholder="m@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="transition-all duration-300 focus:shadow-[var(--shadow-soft)]"
+                    className="transition-all duration-300 focus:shadow-[var(--shadow-soft)] focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   />
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="signin-password">Password</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="signin-password">Password</Label>
+                    <Button variant="link" type="button" className="h-auto p-0 text-xs" asChild>
+                      <Link to="#" onClick={(e) => e.preventDefault()}>Forgot password?</Link>
+                    </Button>
+                  </div>
                   <Input
                     id="signin-password"
                     type="password"
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="transition-all duration-300 focus:shadow-[var(--shadow-soft)]"
+                    className="transition-all duration-300 focus:shadow-[var(--shadow-soft)] focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   />
                 </div>
               </CardContent>
               
-              <CardFooter>
+              <CardFooter className="flex flex-col gap-4">
                 <Button 
                   type="submit" 
                   className="w-full bg-primary hover:bg-primary/90 text-primary-foreground transition-[var(--transition-smooth)] shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-soft)]"

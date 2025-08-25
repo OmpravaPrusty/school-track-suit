@@ -16,9 +16,9 @@ interface SME {
   full_name: string;
   email: string;
   phone: string;
+  department: string;
+  employee_id: string;
   specialization: string;
-  bio: string;
-  experience_years: number;
   status: "active" | "inactive";
 }
 
@@ -32,9 +32,9 @@ const SMEManagement = () => {
     full_name: "",
     email: "",
     phone: "",
+    department: "",
+    employee_id: "",
     specialization: "",
-    bio: "",
-    experience_years: "",
     password: "",
   });
 
@@ -55,9 +55,9 @@ const SMEManagement = () => {
         .from('smes')
         .select(`
           id,
+          department,
+          employee_id,
           specialization,
-          bio,
-          experience_years,
           profiles!inner (
             full_name,
             email,
@@ -73,9 +73,9 @@ const SMEManagement = () => {
         full_name: sme.profiles.full_name,
         email: sme.profiles.email,
         phone: sme.profiles.phone || '',
+        department: sme.department || '',
+        employee_id: sme.employee_id || '',
         specialization: sme.specialization || '',
-        bio: sme.bio || '',
-        experience_years: sme.experience_years || 0,
         status: sme.profiles.status as "active" | "inactive",
       })) || [];
 
@@ -120,9 +120,9 @@ const SMEManagement = () => {
         const { error: smeError } = await supabase
           .from('smes')
           .update({
+            department: formData.department,
+            employee_id: formData.employee_id,
             specialization: formData.specialization,
-            bio: formData.bio,
-            experience_years: parseInt(formData.experience_years) || 0,
           })
           .eq('id', editingSME.id);
 
@@ -156,9 +156,9 @@ const SMEManagement = () => {
           .from('smes')
           .insert({
             id: authData.user.id,
+            department: formData.department,
+            employee_id: formData.employee_id,
             specialization: formData.specialization,
-            bio: formData.bio,
-            experience_years: parseInt(formData.experience_years) || 0,
           });
 
         if (smeError) throw smeError;
@@ -196,9 +196,9 @@ const SMEManagement = () => {
       full_name: "",
       email: "",
       phone: "",
+      department: "",
+      employee_id: "",
       specialization: "",
-      bio: "",
-      experience_years: "",
       password: "",
     });
     setEditingSME(null);
@@ -211,9 +211,9 @@ const SMEManagement = () => {
       full_name: sme.full_name,
       email: sme.email,
       phone: sme.phone,
+      department: sme.department,
+      employee_id: sme.employee_id,
       specialization: sme.specialization,
-      bio: sme.bio,
-      experience_years: sme.experience_years.toString(),
       password: "",
     });
     setIsDialogOpen(true);
@@ -329,14 +329,22 @@ const SMEManagement = () => {
                     placeholder="Enter phone number"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="experience_years">Experience (years)</Label>
+                 <div className="space-y-2">
+                  <Label htmlFor="department">Department</Label>
                   <Input
-                    id="experience_years"
-                    type="number"
-                    value={formData.experience_years}
-                    onChange={(e) => setFormData({ ...formData, experience_years: e.target.value })}
-                    placeholder="Years of experience"
+                    id="department"
+                    value={formData.department}
+                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                    placeholder="Enter department"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="employee_id">Employee ID</Label>
+                  <Input
+                    id="employee_id"
+                    value={formData.employee_id}
+                    onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
+                    placeholder="Enter employee ID"
                   />
                 </div>
                 <div className="space-y-2">
@@ -347,16 +355,6 @@ const SMEManagement = () => {
                     onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
                     placeholder="Area of expertise"
                     required
-                  />
-                </div>
-                <div className="space-y-2 col-span-2">
-                  <Label htmlFor="bio">Bio</Label>
-                  <Textarea
-                    id="bio"
-                    value={formData.bio}
-                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                    placeholder="Brief bio and background"
-                    rows={3}
                   />
                 </div>
                 {!editingSME && (
@@ -396,9 +394,9 @@ const SMEManagement = () => {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
+                <TableHead>Department</TableHead>
+                <TableHead>Employee ID</TableHead>
                 <TableHead>Specialization</TableHead>
-                <TableHead>Experience</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -408,9 +406,9 @@ const SMEManagement = () => {
                 <TableRow key={sme.id}>
                   <TableCell className="font-medium">{sme.full_name}</TableCell>
                   <TableCell>{sme.email}</TableCell>
-                  <TableCell>{sme.phone}</TableCell>
+                  <TableCell>{sme.department}</TableCell>
+                  <TableCell>{sme.employee_id}</TableCell>
                   <TableCell>{sme.specialization}</TableCell>
-                  <TableCell>{sme.experience_years} years</TableCell>
                   <TableCell>
                     <Badge variant={sme.status === "active" ? "default" : "secondary"}>
                       {sme.status}

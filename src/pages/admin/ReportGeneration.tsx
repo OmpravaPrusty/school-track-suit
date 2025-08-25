@@ -1,383 +1,252 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { FileText, Download, Users, School, Building, BookOpen, GraduationCap } from "lucide-react";
+import { FileText, Download, Loader2, Eye } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
+import AttendancePDF from '@/components/AttendancePDF';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { startOfMonth, endOfMonth, getDaysInMonth } from 'date-fns';
 
-interface ReportData {
-  student: {
-    name: string;
-    email: string;
-    phone: string;
-    class: string;
-    batch: string;
-    attendance: string;
-    performance: string;
-    organization: string;
-    school: string;
-  };
-  teacher: {
-    name: string;
-    email: string;
-    phone: string;
-    subject: string;
-    experience: string;
-    organization: string;
-    school: string;
-  };
-  sme: {
-    name: string;
-    email: string;
-    phone: string;
-    specialization: string;
-    experience: string;
-    organization: string;
-    sessionsDelivered: string;
-  };
-  school: {
-    name: string;
-    email: string;
-    phone: string;
-    address: string;
-    organization: string;
-    totalStudents: string;
-    totalTeachers: string;
-    attendancePercentage: string;
-  };
-  organization: {
-    name: string;
-    email: string;
-    phone: string;
-    address: string;
-    type: string;
-    totalSchools: string;
-    totalStudents: string;
-    totalTeachers: string;
-    overallAttendance: string;
+interface Batch {
+  id: string;
+  name: string;
+}
+
+interface StudentProfile {
+  id: string; // This is the profile UUID
+  full_name: string;
+  students: {
+    student_id: string; // This is the human-readable ID
   };
 }
 
-const mockData: ReportData = {
-  student: {
-    name: "John Doe",
-    email: "john.doe@student.edu",
-    phone: "+1234567890",
-    class: "11th Grade",
-    batch: "Batch 2024",
-    attendance: "85%",
-    performance: "Grade A",
-    organization: "Tech University",
-    school: "Engineering College",
-  },
-  teacher: {
-    name: "Dr. Jane Smith",
-    email: "jane.smith@tech.edu",
-    phone: "+1234567891",
-    subject: "Physics",
-    experience: "8 years",
-    organization: "Tech University",
-    school: "Engineering College",
-  },
-  sme: {
-    name: "Prof. Michael Brown",
-    email: "michael.brown@expert.com",
-    phone: "+1234567892",
-    specialization: "Machine Learning",
-    experience: "12 years",
-    organization: "Tech University",
-    sessionsDelivered: "25",
-  },
-  school: {
-    name: "Engineering College",
-    email: "info@engineering.tech.edu",
-    phone: "+1234567893",
-    address: "123 Tech Street, Tech City",
-    organization: "Tech University",
-    totalStudents: "1,250",
-    totalTeachers: "85",
-    attendancePercentage: "87%",
-  },
-  organization: {
-    name: "Tech University",
-    email: "info@techuniversity.edu",
-    phone: "+1234567894",
-    address: "123 University Ave, Tech City",
-    type: "University",
-    totalSchools: "5",
-    totalStudents: "5,000",
-    totalTeachers: "400",
-    overallAttendance: "85%",
-  },
-};
+interface AttendanceRecord {
+  student_id: string;
+  status: 'present' | 'absent';
+}
 
-const mockOrganizations = ["Tech University", "Science Academy", "Arts Institute"];
-const mockSchools = {
-  "Tech University": ["Engineering College", "IT College"],
-  "Science Academy": ["Physics Department", "Chemistry Department"],
-  "Arts Institute": ["Fine Arts School", "Music School"],
-};
+interface ReportData {
+  students: {
+    name: string;
+    id: string; // This is the human-readable student_id
+    present: number;
+    absent: number;
+    percentage: number;
+  }[];
+  batchName: string;
+  month: string;
+  totalPresent: number;
+  totalAbsent: number;
+  overallPercentage: number;
+}
 
 const ReportGeneration = () => {
-  const [reportType, setReportType] = useState("");
-  const [selectedOrganization, setSelectedOrganization] = useState("");
-  const [selectedSchool, setSelectedSchool] = useState("");
-  const [selectedEntity, setSelectedEntity] = useState("");
-  const [generatedReport, setGeneratedReport] = useState<any>(null);
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [selectedBatch, setSelectedBatch] = useState<string>("");
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState<boolean>(false);
 
-  const reportTypes = [
-    { value: "student", label: "Student Report", icon: Users },
-    { value: "teacher", label: "Teacher Report", icon: BookOpen },
-    { value: "sme", label: "SME Report", icon: GraduationCap },
-    { value: "school", label: "School Report", icon: School },
-    { value: "organization", label: "Organization Report", icon: Building },
-  ];
+  useEffect(() => {
+    const fetchBatches = async () => {
+      const { data, error } = await supabase.from("batches").select("id, name").order("name");
+      if (error) {
+        toast({ title: "Error fetching batches", description: error.message, variant: "destructive" });
+      } else {
+        setBatches(data || []);
+      }
+    };
+    fetchBatches();
+  }, []);
 
-  const getEntitiesByType = () => {
-    switch (reportType) {
-      case "student":
-        return ["John Doe", "Jane Smith", "Mike Johnson"];
-      case "teacher":
-        return ["Dr. Jane Smith", "Prof. Bob Wilson", "Dr. Alice Cooper"];
-      case "sme":
-        return ["Prof. Michael Brown", "Dr. Sarah Davis", "Prof. Tom Anderson"];
-      case "school":
-        return selectedOrganization 
-          ? mockSchools[selectedOrganization as keyof typeof mockSchools] || []
-          : [];
-      case "organization":
-        return mockOrganizations;
-      default:
-        return [];
-    }
-  };
+  // Reset report data if controls change
+  useEffect(() => {
+    setReportData(null);
+  }, [selectedBatch, selectedMonth, selectedYear]);
 
-  const handleGenerateReport = () => {
-    if (!reportType) {
-      toast({
-        title: "Error",
-        description: "Please select a report type",
-        variant: "destructive",
-      });
+  const handleGenerateReport = async () => {
+    if (!selectedBatch) {
+      toast({ title: "Missing Information", description: "Please select a batch.", variant: "destructive" });
       return;
     }
 
-    if (reportType !== "organization" && !selectedOrganization) {
-      toast({
-        title: "Error",
-        description: "Please select an organization",
-        variant: "destructive",
+    setIsGenerating(true);
+    setReportData(null);
+
+    try {
+      // 1. Fetch students in the selected batch
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('profiles')
+        .select('id, full_name, students!inner(student_id, batch_id)')
+        .eq('students.batch_id', selectedBatch);
+
+      if (studentsError) throw studentsError;
+      const students = studentsData as StudentProfile[];
+
+      // 2. Fetch attendance for these students for the selected month
+      const fromDate = startOfMonth(new Date(selectedYear, selectedMonth));
+      const toDate = endOfMonth(new Date(selectedYear, selectedMonth));
+
+      const { data: attendanceData, error: attendanceError } = await supabase
+        .from('attendance')
+        .select('student_id, status')
+        .in('student_id', students.map(s => s.id))
+        .gte('attendance_date', fromDate.toISOString())
+        .lte('attendance_date', toDate.toISOString());
+
+      if (attendanceError) throw attendanceError;
+      const attendanceRecords = attendanceData as AttendanceRecord[];
+
+      // 3. Process the data
+      const totalDaysInMonth = getDaysInMonth(new Date(selectedYear, selectedMonth));
+      let totalPresent = 0;
+      let totalAbsent = 0;
+
+      const processedStudents = students.map(student => {
+        const studentAttendance = attendanceRecords.filter(rec => rec.student_id === student.id);
+        const present = studentAttendance.filter(rec => rec.status === 'present').length;
+        const absent = studentAttendance.filter(rec => rec.status === 'absent').length;
+        // Assuming non-recorded days are absent for percentage calculation
+        const totalRecordedOrAssumed = present + absent; // Or use totalDaysInMonth
+        const percentage = totalRecordedOrAssumed > 0 ? Math.round((present / totalRecordedOrAssumed) * 100) : 0;
+
+        totalPresent += present;
+        totalAbsent += absent;
+
+        return {
+          id: student.students.student_id || 'N/A',
+          name: student.full_name,
+          present,
+          absent,
+          percentage,
+        };
       });
-      return;
-    }
 
-    if (["student", "teacher", "sme"].includes(reportType) && !selectedSchool) {
-      toast({
-        title: "Error",
-        description: "Please select a school",
-        variant: "destructive",
+      const overallTotal = totalPresent + totalAbsent;
+      const overallPercentage = overallTotal > 0 ? Math.round((totalPresent / overallTotal) * 100) : 0;
+
+      const monthName = new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long', year: 'numeric' });
+      const batchName = batches.find(b => b.id === selectedBatch)?.name || 'Unknown Batch';
+
+      setReportData({
+        students: processedStudents,
+        batchName,
+        month: monthName,
+        totalPresent,
+        totalAbsent,
+        overallPercentage,
       });
-      return;
+
+      toast({ title: "Report Generated", description: "Your PDF is ready for download.", variant: "success" });
+
+    } catch (error: any) {
+      toast({ title: "Error Generating Report", description: error.message, variant: "destructive" });
+      setReportData(null);
+    } finally {
+      setIsGenerating(false);
     }
-
-    if (!selectedEntity && reportType !== "organization") {
-      toast({
-        title: "Error",
-        description: `Please select a ${reportType}`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Generate report based on selected type
-    const reportData = mockData[reportType as keyof typeof mockData];
-    setGeneratedReport({
-      type: reportType,
-      data: reportData,
-      organization: selectedOrganization,
-      school: selectedSchool,
-      entity: selectedEntity,
-      generatedAt: new Date().toLocaleString(),
-    });
-
-    toast({
-      title: "Success",
-      description: "Report generated successfully",
-    });
   };
 
-  const handleDownloadReport = () => {
-    if (!generatedReport) return;
-
-    const reportContent = JSON.stringify(generatedReport, null, 2);
-    const blob = new Blob([reportContent], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${generatedReport.type}_report_${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    toast({
-      title: "Success",
-      description: "Report downloaded successfully",
-    });
-  };
-
-  const renderReportContent = () => {
-    if (!generatedReport) return null;
-
-    const { data, type } = generatedReport;
-
-    return (
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            {type.charAt(0).toUpperCase() + type.slice(1)} Report
-          </CardTitle>
-          <CardDescription>
-            Generated on {generatedReport.generatedAt}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            {Object.entries(data).map(([key, value]) => (
-              <div key={key} className="space-y-1">
-                <Label className="text-sm font-medium capitalize">
-                  {key.replace(/([A-Z])/g, ' $1').trim()}
-                </Label>
-                <p className="text-sm text-muted-foreground">{value as string}</p>
-              </div>
-            ))}
-          </div>
-          
-          <div className="flex justify-end pt-4">
-            <Button onClick={handleDownloadReport} className="gap-2">
-              <Download className="h-4 w-4" />
-              Download Report
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
-
-  const availableSchools = selectedOrganization 
-    ? mockSchools[selectedOrganization as keyof typeof mockSchools] || []
-    : [];
-
-  const availableEntities = getEntitiesByType();
+  const months = Array.from({ length: 12 }, (_, i) => new Date(0, i).toLocaleString('default', { month: 'long' }));
+  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Report Generation</h1>
-        <p className="text-muted-foreground">Generate detailed reports for various entities</p>
+        <p className="text-muted-foreground">Generate monthly attendance reports for batches.</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Generate Report</CardTitle>
-          <CardDescription>
-            Select the type of report and entity to generate a detailed report
-          </CardDescription>
+          <CardTitle>Generate Attendance Report</CardTitle>
+          <CardDescription>Select a batch and a month to generate a PDF attendance report.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>Report Type</Label>
-              <Select value={reportType} onValueChange={setReportType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select report type" />
-                </SelectTrigger>
+              <Label>Batch</Label>
+              <Select value={selectedBatch} onValueChange={setSelectedBatch}>
+                <SelectTrigger><SelectValue placeholder="Select a batch" /></SelectTrigger>
                 <SelectContent>
-                  {reportTypes.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      <div className="flex items-center gap-2">
-                        <type.icon className="h-4 w-4" />
-                        {type.label}
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {batches.map((batch) => (<SelectItem key={batch.id} value={batch.id}>{batch.name}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>
-
-            {reportType && reportType !== "organization" && (
-              <div className="space-y-2">
-                <Label>Organization</Label>
-                <Select 
-                  value={selectedOrganization} 
-                  onValueChange={(value) => {
-                    setSelectedOrganization(value);
-                    setSelectedSchool("");
-                    setSelectedEntity("");
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select organization" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {mockOrganizations.map((org) => (
-                      <SelectItem key={org} value={org}>{org}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {reportType && ["student", "teacher", "sme"].includes(reportType) && selectedOrganization && (
-              <div className="space-y-2">
-                <Label>School</Label>
-                <Select 
-                  value={selectedSchool} 
-                  onValueChange={(value) => {
-                    setSelectedSchool(value);
-                    setSelectedEntity("");
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select school" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableSchools.map((school) => (
-                      <SelectItem key={school} value={school}>{school}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {reportType && reportType !== "organization" && (
-              <div className="space-y-2">
-                <Label>{reportType.charAt(0).toUpperCase() + reportType.slice(1)}</Label>
-                <Select value={selectedEntity} onValueChange={setSelectedEntity}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={`Select ${reportType}`} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableEntities.map((entity) => (
-                      <SelectItem key={entity} value={entity}>{entity}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label>Month</Label>
+              <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
+                <SelectTrigger><SelectValue placeholder="Select a month" /></SelectTrigger>
+                <SelectContent>
+                  {months.map((month, index) => (<SelectItem key={index} value={index.toString()}>{month}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Year</Label>
+              <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+                <SelectTrigger><SelectValue placeholder="Select a year" /></SelectTrigger>
+                <SelectContent>
+                  {years.map((year) => (<SelectItem key={year} value={year.toString()}>{year}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <Button onClick={handleGenerateReport} className="w-full gap-2">
-            <FileText className="h-4 w-4" />
-            Generate Report
+          <Button onClick={handleGenerateReport} className="w-full gap-2" disabled={isGenerating}>
+            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+            {isGenerating ? "Generating..." : "Generate PDF Report"}
           </Button>
         </CardContent>
       </Card>
 
-      {renderReportContent()}
+      {reportData && !isGenerating && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Your Report is Ready</CardTitle>
+            <CardDescription>Preview the generated report or download it as a PDF.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col sm:flex-row gap-4">
+            <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full gap-2">
+                  <Eye className="h-4 w-4" />
+                  Preview Report
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl h-[90vh]">
+                <DialogHeader>
+                  <DialogTitle>Report Preview</DialogTitle>
+                </DialogHeader>
+                <div className="h-full">
+                  <PDFViewer width="100%" height="100%" className="rounded-md">
+                    <AttendancePDF data={reportData} />
+                  </PDFViewer>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <PDFDownloadLink
+              document={<AttendancePDF data={reportData} />}
+              fileName={`${reportData.batchName}_${reportData.month}_Attendance.pdf`}
+              className="w-full"
+            >
+              {({ loading }) => (
+                <Button className="w-full gap-2" disabled={loading}>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  {loading ? 'Preparing...' : 'Download PDF'}
+                </Button>
+              )}
+            </PDFDownloadLink>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

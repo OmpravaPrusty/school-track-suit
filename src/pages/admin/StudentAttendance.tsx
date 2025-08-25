@@ -29,6 +29,7 @@ const StudentAttendance = () => {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
+  const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent'>>({});
 
   const viewTypes = [
     { value: "day", label: "Day View" },
@@ -41,10 +42,10 @@ const StudentAttendance = () => {
   }, []);
 
   useEffect(() => {
-    if (selectedBatch) {
-      fetchStudents();
+    if (selectedBatch && viewType) {
+      fetchStudentsAndAttendance();
     }
-  }, [selectedBatch]);
+  }, [selectedBatch, viewType]);
 
   const fetchBatches = async () => {
     try {
@@ -67,38 +68,61 @@ const StudentAttendance = () => {
     }
   };
 
-  const fetchStudents = async () => {
+  const fetchStudentsAndAttendance = async () => {
+    if (!selectedBatch || !viewType) return;
+    setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data: studentsData, error: studentsError } = await supabase
         .from('profiles')
-        .select(`
-          id,
-          full_name,
-          students!inner (
-            student_id
-          )
-        `)
+        .select('id, full_name, students!inner(student_id)')
         .eq('students.batch_id', selectedBatch);
 
-      if (error) throw error;
-      setStudents(data || []);
+      if (studentsError) throw studentsError;
+      setStudents(studentsData || []);
+
+      const studentIds = studentsData.map(s => s.id);
+      const dateRange = generateDates();
+      if (dateRange.length === 0 || studentIds.length === 0) {
+        setAttendance({});
+        setLoading(false);
+        return;
+      }
+
+      const startDate = formatDate(dateRange[0]);
+      const endDate = formatDate(dateRange[dateRange.length - 1]);
+
+      const { data: attendanceData, error: attendanceError } = await supabase
+        .from('attendance')
+        .select('student_id, status, attendance_date')
+        .in('student_id', studentIds)
+        .gte('attendance_date', startDate)
+        .lte('attendance_date', endDate);
+
+      if (attendanceError) throw attendanceError;
+
+      const newAttendanceState: Record<string, 'present' | 'absent'> = {};
+      attendanceData.forEach(record => {
+        const key = `${record.student_id}|${record.attendance_date}`;
+        newAttendanceState[key] = record.status as 'present' | 'absent';
+      });
+      setAttendance(newAttendanceState);
+
     } catch (error) {
-      console.error('Error fetching students:', error);
+      console.error('Error fetching data:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch students",
+        description: "Failed to fetch students or attendance",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Generate dates based on view type
   const generateDates = () => {
     if (!viewType) return [];
-    
     const today = new Date();
     const dates = [];
-    
     if (viewType === "day") {
       dates.push(today);
     } else if (viewType === "week") {
@@ -110,50 +134,56 @@ const StudentAttendance = () => {
     } else if (viewType === "month") {
       const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
       const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-      
-      for (let d = firstDay; d <= lastDay; d.setDate(d.getDate() + 1)) {
+      for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
         dates.push(new Date(d));
       }
     }
-    
     return dates;
   };
 
   const dates = generateDates();
-  const [attendance, setAttendance] = useState<Record<string, boolean>>({});
 
   const handleAttendanceToggle = (studentId: string, date: string) => {
-    const key = `${studentId}-${date}`;
-    setAttendance(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
+    const key = `${studentId}|${date}`;
+    setAttendance(prev => {
+      const currentStatus = prev[key];
+      const newStatus = currentStatus === 'present' ? 'absent' : 'present';
+      return { ...prev, [key]: newStatus };
+    });
   };
 
   const saveAttendance = async () => {
     try {
-      const attendanceRecords = Object.entries(attendance).map(([key, isPresent]) => {
-        const [studentId, dateStr] = key.split('-');
-        return {
-          student_id: studentId,
-          status: (isPresent ? 'present' : 'absent') as 'present' | 'absent' | 'late',
-          check_in_time: new Date(`${dateStr} 09:00:00`).toISOString(),
-          session_id: null, // Can be linked to a session later
-        };
+      const attendanceChanges = Object.entries(attendance);
+      if (attendanceChanges.length === 0) {
+        toast({ title: "No changes to save.", variant: "default" });
+        return;
+      }
+
+      const promises = attendanceChanges.map(async ([key, status]) => {
+        const [student_id, attendance_date] = key.split('|');
+
+        const { data: existing } = await supabase
+          .from('attendance')
+          .select('id')
+          .eq('student_id', student_id)
+          .eq('attendance_date', attendance_date)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase.from('attendance').update({ status }).eq('id', existing.id).throwOnError();
+        } else {
+          await supabase.from('attendance').insert({ student_id, attendance_date, status, sme_id: null }).throwOnError();
+        }
       });
 
-      const { error } = await supabase
-        .from('attendance')
-        .upsert(attendanceRecords, {
-          onConflict: 'student_id,session_id'
-        });
-
-      if (error) throw error;
+      await Promise.all(promises);
 
       toast({
         title: "Success",
         description: "Attendance saved successfully",
       });
+      fetchStudentsAndAttendance();
     } catch (error: any) {
       console.error('Error saving attendance:', error);
       toast({
@@ -165,11 +195,10 @@ const StudentAttendance = () => {
   };
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      month: '2-digit', 
-      day: '2-digit', 
-      year: 'numeric' 
-    });
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const isDateInFuture = (date: Date) => {
@@ -256,7 +285,7 @@ const StudentAttendance = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-md border">
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-border">
@@ -283,8 +312,9 @@ const StudentAttendance = () => {
                        <td className="p-3 text-muted-foreground">{student.students?.student_id || '-'}</td>
                       {dates.map((date) => {
                         const dateStr = formatDate(date);
-                        const key = `${student.id}-${dateStr}`;
-                        const isPresent = attendance[key] || false;
+                        const key = `${student.id}|${dateStr}`;
+                        const status = attendance[key] || 'absent';
+                        const isPresent = status === 'present';
                         const isFuture = isDateInFuture(date);
                         
                          return (

@@ -88,7 +88,7 @@ const Login = () => {
           <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
             <GraduationCap className="h-8 w-8 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold">Education Portal</CardTitle>
+          <CardTitle className="text-2xl font-bold">Ashwakalpam Portal</CardTitle>
           <CardDescription className="text-muted-foreground">
             Sign in to access your dashboard
           </CardDescription>
@@ -150,7 +150,7 @@ const Login = () => {
           </CardFooter>
         </form>
         
-        <div className="px-6 pb-6 space-y-2 text-center text-xs text-muted-foreground">
+        {/* <div className="px-6 pb-6 space-y-2 text-center text-xs text-muted-foreground">
           <p className="font-medium">Demo Credentials:</p>
           <div className="grid grid-cols-1 gap-1">
             <p>Admin: admin@school.com / admin123</p>
@@ -159,7 +159,7 @@ const Login = () => {
             <p>SME: sme@school.com / sme123</p>
             <p>Student: student@school.com / student123</p>
           </div>
-        </div>
+        </div> */}
       </Card>
     </div>
   );

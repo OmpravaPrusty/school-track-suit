@@ -1,51 +1,66 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, Users } from "lucide-react";
+import { Plus, Trash2, Users } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-
-interface Student {
-  id: string;
-  name: string;
-  email: string;
-  class: string;
-}
+import { supabase } from "@/integrations/supabase/client";
 
 interface Batch {
   id: string;
   name: string;
-  createdDate: string;
-  studentIds: string[];
+  created_at: string;
+  student_count: number;
 }
 
-const mockStudents: Student[] = [
-  { id: "1", name: "John Doe", email: "john@example.com", class: "10th" },
-  { id: "2", name: "Jane Smith", email: "jane@example.com", class: "10th" },
-  { id: "3", name: "Mike Johnson", email: "mike@example.com", class: "11th" },
-  { id: "4", name: "Sarah Wilson", email: "sarah@example.com", class: "11th" },
-  { id: "5", name: "David Brown", email: "david@example.com", class: "12th" },
-];
-
 const BatchManagement = () => {
-  const [batches, setBatches] = useState<Batch[]>([
-    { id: "1", name: "Batch 2023", createdDate: "2023-01-15", studentIds: ["1", "2"] },
-    { id: "2", name: "Batch 2024", createdDate: "2024-01-15", studentIds: ["3", "4"] },
-    { id: "3", name: "Batch 2025", createdDate: "2025-01-15", studentIds: ["5"] },
-  ]);
-  
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isStudentDialogOpen, setIsStudentDialogOpen] = useState(false);
-  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
-  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [formData, setFormData] = useState({ name: "" });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    fetchBatches();
+  }, []);
+
+  const fetchBatches = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('batches')
+        .select(`
+          id,
+          name,
+          created_at,
+          students!inner(count)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedBatches = data.map(batch => ({
+        id: batch.id,
+        name: batch.name,
+        created_at: new Date(batch.created_at).toLocaleDateString(),
+        student_count: batch.students[0]?.count || 0,
+      }));
+
+      setBatches(formattedBatches);
+    } catch (error: any) {
+      toast({
+        title: "Error fetching batches",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) {
       toast({
@@ -56,58 +71,70 @@ const BatchManagement = () => {
       return;
     }
 
-    const newBatch: Batch = {
-      id: Date.now().toString(),
-      name: formData.name,
-      createdDate: new Date().toISOString().split('T')[0],
-      studentIds: [],
-    };
+    try {
+      const { data, error } = await supabase
+        .from('batches')
+        .insert({ name: formData.name })
+        .select(`
+          id,
+          name,
+          created_at
+        `)
+        .single();
 
-    setBatches([...batches, newBatch]);
-    setFormData({ name: "" });
-    setIsDialogOpen(false);
-    toast({
-      title: "Success",
-      description: "Batch created successfully",
-    });
-  };
+      if (error) throw error;
 
-  const handleDelete = (id: string) => {
-    setBatches(batches.filter(batch => batch.id !== id));
-    toast({
-      title: "Success",
-      description: "Batch deleted successfully",
-    });
-  };
+      if (data) {
+        const newBatch = {
+          id: data.id,
+          name: data.name,
+          created_at: new Date(data.created_at).toLocaleDateString(),
+          student_count: 0,
+        };
+        setBatches([newBatch, ...batches]);
+      }
 
-  const handleStudentSelection = (studentId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedStudents([...selectedStudents, studentId]);
-    } else {
-      setSelectedStudents(selectedStudents.filter(id => id !== studentId));
+      setFormData({ name: "" });
+      setIsDialogOpen(false);
+      toast({
+        title: "Success",
+        description: "Batch created successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error creating batch",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
-  const handleAssignStudents = () => {
-    if (!selectedBatch) return;
+  const handleDelete = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('batches')
+        .delete()
+        .eq('id', id);
 
-    setBatches(batches.map(batch => 
-      batch.id === selectedBatch.id 
-        ? { ...batch, studentIds: [...new Set([...batch.studentIds, ...selectedStudents])] }
-        : batch
-    ));
+      if (error) throw error;
 
-    setSelectedStudents([]);
-    setIsStudentDialogOpen(false);
-    toast({
-      title: "Success",
-      description: "Students assigned to batch successfully",
-    });
+      toast({
+        title: "Success",
+        description: "Batch deleted successfully",
+      });
+      fetchBatches(); // Refresh data
+    } catch (error: any) {
+      toast({
+        title: "Error deleting batch",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
-  const getStudentsByBatch = (batch: Batch) => {
-    return mockStudents.filter(student => batch.studentIds.includes(student.id));
-  };
+  if (loading) {
+      return <div>Loading...</div>
+  }
 
   return (
     <div className="space-y-6">
@@ -172,33 +199,15 @@ const BatchManagement = () => {
               {batches.map((batch) => (
                 <TableRow key={batch.id}>
                   <TableCell className="font-medium">{batch.name}</TableCell>
-                  <TableCell>{batch.createdDate}</TableCell>
+                  <TableCell>{batch.created_at}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary">{batch.studentIds.length} students</Badge>
-                      {getStudentsByBatch(batch).slice(0, 2).map((student) => (
-                        <span key={student.id} className="text-sm text-muted-foreground">
-                          {student.name}
-                        </span>
-                      ))}
-                      {batch.studentIds.length > 2 && (
-                        <span className="text-sm text-muted-foreground">...</span>
-                      )}
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span>{batch.student_count}</span>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => {
-                          setSelectedBatch(batch);
-                          setSelectedStudents([]);
-                          setIsStudentDialogOpen(true);
-                        }}
-                      >
-                        <Users className="h-4 w-4" />
-                      </Button>
                       <Button
                         variant="outline"
                         size="icon"
@@ -214,59 +223,6 @@ const BatchManagement = () => {
           </Table>
         </CardContent>
       </Card>
-
-      {/* Student Assignment Dialog */}
-      <Dialog open={isStudentDialogOpen} onOpenChange={setIsStudentDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Assign Students to {selectedBatch?.name}</DialogTitle>
-            <DialogDescription>
-              Select students to add to this batch
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-96 overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">Select</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Class</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {mockStudents.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedStudents.includes(student.id)}
-                        onCheckedChange={(checked) => 
-                          handleStudentSelection(student.id, checked as boolean)
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>{student.name}</TableCell>
-                    <TableCell>{student.email}</TableCell>
-                    <TableCell>{student.class}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <DialogFooter>
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => setIsStudentDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleAssignStudents}>
-              Assign {selectedStudents.length} Students
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

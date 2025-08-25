@@ -1,15 +1,30 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, GraduationCap, Clock, ArrowLeft } from "lucide-react";
+import { Calendar, GraduationCap, Clock, ArrowLeft, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
+
+interface SME {
+  id: string;
+  name: string;
+  department: string;
+  employee_id: string;
+}
 
 const SMEAttendance = () => {
   const navigate = useNavigate();
-  const [viewType, setViewType] = useState("");
+  const { toast } = useToast();
+  const [viewType, setViewType] = useState("day");
+  const [smeList, setSmeList] = useState<SME[]>([]);
+  const [dates, setDates] = useState<Date[]>([]);
+  const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent'>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const viewTypes = [
     { value: "day", label: "Day View" },
@@ -17,66 +32,207 @@ const SMEAttendance = () => {
     { value: "month", label: "Month View" },
   ];
 
-  // Mock SME data
-  const smeList = [
-    { id: 1, name: "Dr. Alice Cooper", department: "Computer Science", employeeId: "SME001" },
-    { id: 2, name: "Prof. Robert Martinez", department: "Mathematics", employeeId: "SME002" },
-    { id: 3, name: "Dr. Jennifer Wong", department: "Physics", employeeId: "SME003" },
-    { id: 4, name: "Prof. David Kumar", department: "Chemistry", employeeId: "SME004" },
-    { id: 5, name: "Dr. Maria Rodriguez", department: "Biology", employeeId: "SME005" },
-  ];
+  const formatDateForSupabase = (date: Date) => {
+    return date.toISOString().split('T')[0];
+  };
 
-  // Generate dates based on view type
-  const generateDates = () => {
+  const generateDates = useCallback(() => {
     if (!viewType) return [];
     
     const today = new Date();
-    const dates = [];
+    const newDates = [];
     
     if (viewType === "day") {
-      dates.push(today);
+      newDates.push(today);
     } else if (viewType === "week") {
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(today.getDate() - i);
-        dates.push(date);
+      const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const firstDayOfWeek = new Date(today);
+      firstDayOfWeek.setDate(today.getDate() - currentDay);
+
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(firstDayOfWeek);
+        date.setDate(firstDayOfWeek.getDate() + i);
+        newDates.push(date);
       }
     } else if (viewType === "month") {
-      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      const year = today.getFullYear();
+      const month = today.getMonth();
+      const numDays = new Date(year, month + 1, 0).getDate();
       
-      for (let d = firstDay; d <= lastDay; d.setDate(d.getDate() + 1)) {
-        dates.push(new Date(d));
+      for (let i = 1; i <= numDays; i++) {
+        newDates.push(new Date(year, month, i));
       }
     }
     
-    return dates;
+    return newDates;
+  }, [viewType]);
+
+  useEffect(() => {
+    const fetchSMEs = async () => {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('smes')
+        .select(`
+          id,
+          employee_id,
+          department,
+          profile:profiles (
+            full_name
+          )
+        `);
+
+      if (error) {
+        console.error("Error fetching SMEs:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch SME list.",
+          variant: "destructive",
+        });
+      } else {
+        const formattedSMEs = data.map(sme => ({
+          id: sme.id,
+          name: sme.profile?.full_name || 'N/A',
+          department: sme.department,
+          employee_id: sme.employee_id,
+        }));
+        setSmeList(formattedSMEs);
+      }
+      setIsLoading(false);
+    };
+
+    fetchSMEs();
+  }, [toast]);
+
+  const fetchAttendance = useCallback(async (smeIds: string[], dateRange: Date[]) => {
+    if (smeIds.length === 0 || dateRange.length === 0) return;
+
+    const startDate = formatDateForSupabase(dateRange[0]);
+    const endDate = formatDateForSupabase(dateRange[dateRange.length - 1]);
+
+    const { data, error } = await supabase
+      .from('attendance')
+      .select('sme_id, attendance_date, status')
+      .in('sme_id', smeIds)
+      .gte('attendance_date', startDate)
+      .lte('attendance_date', endDate);
+
+    if (error) {
+      console.error("Error fetching attendance:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch attendance records.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newAttendance: Record<string, 'present' | 'absent'> = {};
+    data.forEach(record => {
+      if (record.sme_id) {
+        const key = `${record.sme_id}|${record.attendance_date}`;
+        newAttendance[key] = record.status as 'present' | 'absent';
+      }
+    });
+    setAttendance(newAttendance);
+  }, [toast]);
+
+
+  useEffect(() => {
+    const newDates = generateDates();
+    setDates(newDates);
+
+    if (smeList.length > 0 && newDates.length > 0) {
+      fetchAttendance(smeList.map(s => s.id), newDates);
+    }
+  }, [viewType, smeList, generateDates, fetchAttendance]);
+
+  const handleAttendanceToggle = (smeId: string, date: Date) => {
+    const dateStr = formatDateForSupabase(date);
+    const key = `${smeId}|${dateStr}`;
+    setAttendance(prev => {
+      const currentStatus = prev[key];
+      const newStatus = currentStatus === 'present' ? 'absent' : 'present';
+      return { ...prev, [key]: newStatus };
+    });
   };
 
-  const dates = generateDates();
-  const [attendance, setAttendance] = useState<Record<string, boolean>>({});
+  const handleSaveAttendance = async () => {
+    setIsSaving(true);
 
-  const handleAttendanceToggle = (smeId: number, date: string) => {
-    const key = `${smeId}-${date}`;
-    setAttendance(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
+    const attendanceChanges = Object.entries(attendance);
+
+    if (attendanceChanges.length === 0) {
+      toast({ title: "No changes to save.", variant: "default" });
+      setIsSaving(false);
+      return;
+    }
+
+    const promises = attendanceChanges.map(async ([key, status]) => {
+      const [sme_id, attendance_date] = key.split('|');
+
+      const { data: existing, error: selectError } = await supabase
+        .from('attendance')
+        .select('id')
+        .eq('sme_id', sme_id)
+        .eq('attendance_date', attendance_date)
+        .maybeSingle();
+
+      if (selectError) {
+        throw new Error(`Failed to check existing attendance for ${sme_id} on ${attendance_date}: ${selectError.message}`);
+      }
+
+      if (existing) {
+        // Update existing record
+        const { error: updateError } = await supabase
+          .from('attendance')
+          .update({ status })
+          .eq('id', existing.id);
+        if (updateError) {
+          throw new Error(`Failed to update attendance for ${sme_id} on ${attendance_date}: ${updateError.message}`);
+        }
+      } else {
+        // Insert new record
+        const { error: insertError } = await supabase
+          .from('attendance')
+          .insert({ sme_id, attendance_date, status, student_id: null });
+        if (insertError) {
+          throw new Error(`Failed to insert attendance for ${sme_id} on ${attendance_date}: ${insertError.message}`);
+        }
+      }
+    });
+
+    try {
+      await Promise.all(promises);
+      toast({
+        title: "Success",
+        description: "Attendance records have been saved successfully.",
+        variant: "success",
+      });
+    } catch (error: any) {
+      console.error("Error saving attendance:", error);
+      toast({
+        title: "Save Failed",
+        description: error.message || "An unexpected error occurred while saving.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const formatDate = (date: Date) => {
+  const formatDateForDisplay = (date: Date) => {
     return date.toLocaleDateString('en-US', { 
-      month: '2-digit', 
-      day: '2-digit', 
-      year: 'numeric' 
+      month: 'short',
+      day: 'numeric'
     });
   };
 
   const isDateInFuture = (date: Date) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    date.setHours(0, 0, 0, 0);
-    return date > today;
+    const comparisonDate = new Date(date);
+    comparisonDate.setHours(0, 0, 0, 0);
+    return comparisonDate > today;
   };
 
   return (
@@ -88,15 +244,15 @@ const SMEAttendance = () => {
           className="flex items-center gap-2"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Attendance
+          Back
         </Button>
         <div className="flex items-center gap-3">
-          <div className="p-3 rounded-lg bg-secondary/10">
-            <GraduationCap className="h-6 w-6 text-secondary" />
+          <div className="p-3 rounded-lg bg-primary/10">
+            <GraduationCap className="h-6 w-6 text-primary" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">SME Attendance</h1>
-            <p className="text-muted-foreground">Track Subject Matter Expert attendance records</p>
+            <p className="text-muted-foreground">Track Subject Matter Expert attendance</p>
           </div>
         </div>
       </div>
@@ -134,71 +290,83 @@ const SMEAttendance = () => {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>SME Attendance Table</span>
-              <Badge variant="outline" className="bg-secondary/10 text-secondary border-secondary/20">
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
                 {viewType.charAt(0).toUpperCase() + viewType.slice(1)} View
               </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left p-3 font-medium text-foreground">SME Name</th>
-                    <th className="text-left p-3 font-medium text-foreground">Department</th>
-                    <th className="text-left p-3 font-medium text-foreground">Employee ID</th>
-                    {dates.map((date) => (
-                      <th key={date.toISOString()} className="text-center p-3 font-medium text-foreground">
-                        <div className="flex flex-col items-center gap-1">
-                          <span className="text-xs">{formatDate(date)}</span>
-                          {isDateInFuture(date) && (
-                            <Badge variant="secondary" className="text-xs px-1 py-0">
-                              Future
-                            </Badge>
-                          )}
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {smeList.map((sme) => (
-                    <tr key={sme.id} className="border-b border-border/50 hover:bg-muted/30">
-                      <td className="p-3 font-medium text-foreground">{sme.name}</td>
-                      <td className="p-3 text-muted-foreground">{sme.department}</td>
-                      <td className="p-3 text-muted-foreground">{sme.employeeId}</td>
-                      {dates.map((date) => {
-                        const dateStr = formatDate(date);
-                        const key = `${sme.id}-${dateStr}`;
-                        const isPresent = attendance[key] || false;
-                        const isFuture = isDateInFuture(date);
-                        
-                        return (
-                          <td key={dateStr} className="p-3 text-center">
-                            <div className="flex flex-col items-center gap-2">
-                              <Switch
-                                checked={isPresent}
-                                onCheckedChange={() => handleAttendanceToggle(sme.id, dateStr)}
-                                disabled={isFuture}
-                                className="data-[state=checked]:bg-success"
-                              />
-                              <span className={`text-xs ${isPresent ? 'text-success' : 'text-muted-foreground'}`}>
-                                {isFuture ? '-' : (isPresent ? 'Present' : 'Absent')}
-                              </span>
-                            </div>
-                          </td>
-                        );
-                      })}
+            {isLoading ? (
+              <div className="flex justify-center items-center h-40">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : smeList.length === 0 ? (
+              <p className="text-center text-muted-foreground py-10">No SMEs found. Please add SMEs first.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-md border">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left p-3 font-medium text-foreground sticky left-0 bg-card z-10">SME Name</th>
+                      <th className="text-left p-3 font-medium text-foreground">Department</th>
+                      <th className="text-left p-3 font-medium text-foreground">Employee ID</th>
+                      {dates.map((date) => (
+                        <th key={date.toISOString()} className="text-center p-3 font-medium text-foreground">
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-xs font-semibold">{date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                            <span className="text-sm">{formatDateForDisplay(date)}</span>
+                            {isDateInFuture(date) && (
+                              <Badge variant="secondary" className="text-xs px-1 py-0">Future</Badge>
+                            )}
+                          </div>
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {smeList.map((sme) => (
+                      <tr key={sme.id} className="border-b border-border/50 hover:bg-muted/30">
+                        <td className="p-3 font-medium text-foreground sticky left-0 bg-card z-10">{sme.name}</td>
+                        <td className="p-3 text-muted-foreground">{sme.department}</td>
+                        <td className="p-3 text-muted-foreground">{sme.employee_id}</td>
+                        {dates.map((date) => {
+                          const dateStr = formatDateForSupabase(date);
+                          const key = `${sme.id}|${dateStr}`;
+                          const status = attendance[key] || 'absent';
+                          const isPresent = status === 'present';
+                          const isFuture = isDateInFuture(date);
+
+                          return (
+                            <td key={key} className="p-3 text-center">
+                              <div className="flex flex-col items-center gap-2">
+                                <Switch
+                                  checked={isPresent}
+                                  onCheckedChange={() => handleAttendanceToggle(sme.id, date)}
+                                  disabled={isFuture}
+                                  className="data-[state=checked]:bg-success"
+                                />
+                                <span className={`text-xs ${isPresent ? 'text-success' : 'text-muted-foreground'}`}>
+                                  {isFuture ? '-' : (isPresent ? 'Present' : 'Absent')}
+                                </span>
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             
             <div className="mt-6 flex justify-end">
-              <Button className="bg-secondary text-secondary-foreground hover:bg-secondary/90">
-                <Clock className="h-4 w-4 mr-2" />
-                Save Attendance
+              <Button
+                onClick={handleSaveAttendance}
+                disabled={isSaving || isLoading || smeList.length === 0}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Clock className="h-4 w-4 mr-2" />}
+                {isSaving ? 'Saving...' : 'Save Attendance'}
               </Button>
             </div>
           </CardContent>

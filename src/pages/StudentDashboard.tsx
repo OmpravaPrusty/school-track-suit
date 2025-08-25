@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { StudentSidebar } from "@/components/StudentSidebar";
 import { AdminHeader } from "@/components/AdminHeader";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import StudentAttendance from "./student/StudentAttendance";
+import StudentMyAttendancePage from "./student/MyAttendancePage";
 import StudentSessions from "./student/StudentSessions";
 import StudentCourses from "./student/StudentCourses";
 import StudentNotifications from "./student/StudentNotifications";
@@ -19,7 +19,7 @@ const StudentDashboard = () => {
             <div className="max-w-7xl mx-auto">
               <Routes>
                 <Route index element={<StudentDashboardHome />} />
-                <Route path="attendance" element={<StudentAttendance />} />
+                <Route path="attendance" element={<StudentMyAttendancePage />} />
                 <Route path="sessions" element={<StudentSessions />} />
                 <Route path="courses" element={<StudentCourses />} />
                 <Route path="notifications" element={<StudentNotifications />} />

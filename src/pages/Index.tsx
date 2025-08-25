@@ -79,7 +79,7 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-16">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4">Educational Management System</h1>
+          <h1 className="text-4xl font-bold mb-4">Ashwakalpam Portal</h1>
           <p className="text-xl text-muted-foreground">Choose your role to access the dashboard</p>
         </div>
         
@@ -95,7 +95,7 @@ const Index = () => {
               </CardHeader>
               <CardContent>
                 <Button asChild className="w-full">
-                  <Link to="/admin-setup">Get Started</Link>
+                  <Link to="/auth">Get Started</Link>
                 </Button>
               </CardContent>
             </Card>
