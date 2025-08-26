@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BookOpen, ArrowLeft } from "lucide-react";
@@ -60,4 +59,4 @@ const TeacherCPD = () => {
   );
 };
 
-export default TeacherCPD;
+export default TeacherCPD

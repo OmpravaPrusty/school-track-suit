@@ -13,7 +13,7 @@ interface MyAttendanceProps {
 
 interface AttendanceRecord {
   attendance_date: string;
-  status: 'present' | 'absent' | 'late';
+  status: 'present' | 'absent';
 }
 
 const MyAttendance = ({ userId, userRole }: MyAttendanceProps) => {
@@ -42,9 +42,8 @@ const MyAttendance = ({ userId, userRole }: MyAttendanceProps) => {
       if (fetchError) {
         console.error("Error fetching attendance:", fetchError);
         setError("Failed to load attendance data.");
-        setAttendance([]);
       } else {
-        setAttendance(data || []);
+        setAttendance(data as AttendanceRecord[] || []);
       }
       setIsLoading(false);
     };
@@ -55,7 +54,7 @@ const MyAttendance = ({ userId, userRole }: MyAttendanceProps) => {
   }, [userId, userRole, date]);
 
   const presentDays = attendance.filter(d => d.status === 'present').map(d => new Date(d.attendance_date + 'T00:00:00'));
-  const absentDays = attendance.filter(d => d.status === 'absent' || d.status === 'late').map(d => new Date(d.attendance_date + 'T00:00:00'));
+  const absentDays = attendance.filter(d => d.status === 'absent').map(d => new Date(d.attendance_date + 'T00:00:00'));
 
   const monthDays = eachDayOfInterval({
     start: startOfMonth(date),

@@ -1,7 +1,5 @@
-
-import { CalendarCheck, Users, GraduationCap, Layers, BookOpen, School, Building, VideoIcon, FileText, FolderOpen, ChevronDown, ChevronRight } from "lucide-react";
+import { CalendarCheck, Users, GraduationCap, Layers, BookOpen, School, Building, VideoIcon, FileText ,FolderOpen, ChevronDown, ChevronRight} from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
-import { useState } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -13,9 +11,10 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
-const mainNavigationItems = [
+const navigationItems = [
   {
     title: "Programs",
     url: "/admin/programs",
@@ -71,6 +70,11 @@ const sankalp90Items = [
     url: "/admin/schools",
     icon: School,
   },
+  // {
+  //   title: "Organizations",
+  //   url: "/admin/organizations",
+  //   icon: Building,
+  // },
   {
     title: "Sessions",
     url: "/admin/sessions",
@@ -81,12 +85,17 @@ const sankalp90Items = [
     url: "/admin/reports",
     icon: FileText,
   },
+  // {
+  //   title: "User Management",
+  //   url: "/admin/user-management",
+  //   icon: Users,
+  // },
 ];
 
 export function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const location = useLocation();
+    const location = useLocation();
   const [programsOpen, setProgramsOpen] = useState(true);
 
   // Check if we're in a Sankalp90 route to show those navigation items
@@ -124,10 +133,9 @@ export function AdminSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent className="px-3">
             <SidebarMenu>
-              {/* Programs Section with Collapsible */}
-              {mainNavigationItems.map((item) => (
+              {navigationItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <Collapsible open={programsOpen && !collapsed} onOpenChange={setProgramsOpen}>
+                   <Collapsible open={programsOpen && !collapsed} onOpenChange={setProgramsOpen}>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton className="h-12 rounded-lg">
                         <div className="flex items-center gap-3 px-3 py-3 rounded-lg transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground w-full">

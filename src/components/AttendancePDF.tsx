@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   table: {
-    display: "table" as any,
+    display: "table",
     width: "auto",
     borderStyle: "solid",
     borderWidth: 1,
