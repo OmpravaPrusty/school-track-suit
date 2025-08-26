@@ -285,16 +285,16 @@ const StudentAttendance = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto rounded-md border">
-              <table className="w-full border-collapse">
+            <div className="overflow-x-auto rounded-md border max-w-full">
+              <table className="border-collapse" style={{ minWidth: viewType === 'month' ? '800px' : 'auto' }}>
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left p-3 font-medium text-foreground">Student</th>
-                    <th className="text-left p-3 font-medium text-foreground">Student ID</th>
+                    <th className="text-left p-3 font-medium text-foreground sticky left-0 bg-background z-10 border-r border-border min-w-[150px]">Student</th>
+                    <th className="text-left p-3 font-medium text-foreground sticky left-[150px] bg-background z-10 border-r border-border min-w-[120px]">Student ID</th>
                     {dates.map((date) => (
-                      <th key={date.toISOString()} className="text-center p-3 font-medium text-foreground">
+                      <th key={date.toISOString()} className="text-center p-3 font-medium text-foreground min-w-[100px] border-r border-border/30">
                         <div className="flex flex-col items-center gap-1">
-                          <span className="text-xs">{formatDate(date)}</span>
+                          <span className="text-xs whitespace-nowrap">{viewType === 'month' ? formatDate(date).split('-')[2] : formatDate(date)}</span>
                           {isDateInFuture(date) && (
                             <Badge variant="secondary" className="text-xs px-1 py-0">
                               Future
@@ -308,8 +308,8 @@ const StudentAttendance = () => {
                 <tbody>
                    {students.map((student) => (
                      <tr key={student.id} className="border-b border-border/50 hover:bg-muted/30">
-                       <td className="p-3 font-medium text-foreground">{student.full_name}</td>
-                       <td className="p-3 text-muted-foreground">{student.students?.student_id || '-'}</td>
+                       <td className="p-3 font-medium text-foreground sticky left-0 bg-background z-10 border-r border-border min-w-[150px]">{student.full_name}</td>
+                       <td className="p-3 text-muted-foreground sticky left-[150px] bg-background z-10 border-r border-border min-w-[120px]">{student.students?.student_id || '-'}</td>
                       {dates.map((date) => {
                         const dateStr = formatDate(date);
                         const key = `${student.id}|${dateStr}`;
@@ -317,21 +317,21 @@ const StudentAttendance = () => {
                         const isPresent = status === 'present';
                         const isFuture = isDateInFuture(date);
                         
-                         return (
-                           <td key={dateStr} className="p-3 text-center">
-                             <div className="flex flex-col items-center gap-2">
-                               <Switch
-                                 checked={isPresent}
-                                 onCheckedChange={() => handleAttendanceToggle(student.id, dateStr)}
-                                 disabled={isFuture}
-                                 className="data-[state=checked]:bg-success"
-                               />
-                               <span className={`text-xs ${isPresent ? 'text-success' : 'text-muted-foreground'}`}>
-                                 {isFuture ? '-' : (isPresent ? 'Present' : 'Absent')}
-                               </span>
-                             </div>
-                           </td>
-                         );
+                          return (
+                            <td key={dateStr} className="p-3 text-center min-w-[100px] border-r border-border/30">
+                              <div className="flex flex-col items-center gap-2">
+                                <Switch
+                                  checked={isPresent}
+                                  onCheckedChange={() => handleAttendanceToggle(student.id, dateStr)}
+                                  disabled={isFuture}
+                                  className="data-[state=checked]:bg-success"
+                                />
+                                <span className={`text-xs whitespace-nowrap ${isPresent ? 'text-success' : 'text-muted-foreground'}`}>
+                                  {isFuture ? '-' : (isPresent ? 'P' : 'A')}
+                                </span>
+                              </div>
+                            </td>
+                          );
                       })}
                     </tr>
                   ))}
