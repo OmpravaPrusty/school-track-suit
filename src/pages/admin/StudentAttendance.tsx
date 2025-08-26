@@ -286,31 +286,30 @@ const StudentAttendance = () => {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto rounded-md border">
-              <div className="relative">
-                <table className="border-collapse w-full">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left p-3 font-medium text-foreground sticky left-0 bg-background z-20 border-r border-border min-w-[180px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Student</th>
-                      <th className="text-left p-3 font-medium text-foreground sticky left-[180px] bg-background z-20 border-r border-border min-w-[120px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Student ID</th>
-                      {dates.map((date) => (
-                        <th key={date.toISOString()} className="text-center p-3 font-medium text-foreground min-w-[120px] border-r border-border/30">
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="text-xs whitespace-nowrap">{viewType === 'month' ? `${formatDate(date).split('-')[2]}/${formatDate(date).split('-')[1]}` : formatDate(date)}</span>
-                            {isDateInFuture(date) && (
-                              <Badge variant="secondary" className="text-xs px-1 py-0">
-                                Future
-                              </Badge>
-                            )}
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                     {students.map((student) => (
-                       <tr key={student.id} className="border-b border-border/50 hover:bg-muted/30">
-                         <td className="p-3 font-medium text-foreground sticky left-0 bg-background z-10 border-r border-border min-w-[180px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">{student.full_name}</td>
-                         <td className="p-3 text-muted-foreground sticky left-[180px] bg-background z-10 border-r border-border min-w-[120px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">{student.students?.student_id || '-'}</td>
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left p-3 font-medium text-foreground">Student</th>
+                    <th className="text-left p-3 font-medium text-foreground">Student ID</th>
+                    {dates.map((date) => (
+                      <th key={date.toISOString()} className="text-center p-3 font-medium text-foreground">
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-xs">{formatDate(date)}</span>
+                          {isDateInFuture(date) && (
+                            <Badge variant="secondary" className="text-xs px-1 py-0">
+                              Future
+                            </Badge>
+                          )}
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                   {students.map((student) => (
+                     <tr key={student.id} className="border-b border-border/50 hover:bg-muted/30">
+                       <td className="p-3 font-medium text-foreground">{student.full_name}</td>
+                       <td className="p-3 text-muted-foreground">{student.students?.student_id || '-'}</td>
                       {dates.map((date) => {
                         const dateStr = formatDate(date);
                         const key = `${student.id}|${dateStr}`;
@@ -319,7 +318,7 @@ const StudentAttendance = () => {
                         const isFuture = isDateInFuture(date);
                         
                          return (
-                           <td key={dateStr} className="p-3 text-center min-w-[120px] border-r border-border/30">
+                           <td key={dateStr} className="p-3 text-center">
                              <div className="flex flex-col items-center gap-2">
                                <Switch
                                  checked={isPresent}
@@ -327,7 +326,7 @@ const StudentAttendance = () => {
                                  disabled={isFuture}
                                  className="data-[state=checked]:bg-success"
                                />
-                               <span className={`text-xs whitespace-nowrap ${isPresent ? 'text-success' : 'text-muted-foreground'}`}>
+                               <span className={`text-xs ${isPresent ? 'text-success' : 'text-muted-foreground'}`}>
                                  {isFuture ? '-' : (isPresent ? 'Present' : 'Absent')}
                                </span>
                              </div>
@@ -336,10 +335,9 @@ const StudentAttendance = () => {
                       })}
                     </tr>
                   ))}
-                     </tbody>
-                  </table>
-                </div>
-              </div>
+                </tbody>
+              </table>
+            </div>
             
             <div className="mt-6 flex justify-end">
               <Button 
