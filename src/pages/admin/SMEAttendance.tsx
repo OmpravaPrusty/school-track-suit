@@ -206,7 +206,6 @@ const SMEAttendance = () => {
       toast({
         title: "Success",
         description: "Attendance records have been saved successfully.",
-        variant: "success",
       });
     } catch (error: any) {
       console.error("Error saving attendance:", error);

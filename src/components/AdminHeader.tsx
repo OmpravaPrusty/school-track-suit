@@ -45,7 +45,6 @@ export function AdminHeader({ title = "Ashwakalpam", subtitle = "Administrator D
       title: "Profile Updated",
       description: "Your profile information has been saved",
     });
-    setIsProfileOpen(false);
   };
 
   return (
