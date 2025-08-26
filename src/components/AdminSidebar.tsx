@@ -31,9 +31,9 @@ const navigationItems = [
         description: "Continuous Professional Development"
       },
       {
-        title: "CACI",
+        title: "Computing and AI",
         url: "/admin/programs/caci",
-        description: "Community and Civic Initiatives"
+        description: "Computing and AI Program"
       }
     ]
   }

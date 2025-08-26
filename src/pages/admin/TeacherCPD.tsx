@@ -21,7 +21,7 @@ const TeacherCPD = () => {
             <BookOpen className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Teacher CPD Program</h1>
+            <h1 className="text-2xl font-bold text-foreground">Teacher CPD </h1>
             <p className="text-muted-foreground">Continuous Professional Development for Teachers</p>
           </div>
         </div>
