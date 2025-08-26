@@ -16,38 +16,41 @@ export type Database = {
     Tables: {
       attendance: {
         Row: {
+          attendance_date: string | null
           check_in_time: string | null
           created_at: string | null
           id: string
           notes: string | null
-          session_id: string | null
+          sme_id: string | null
           status: Database["public"]["Enums"]["attendance_status"]
           student_id: string | null
         }
         Insert: {
+          attendance_date?: string | null
           check_in_time?: string | null
           created_at?: string | null
           id?: string
           notes?: string | null
-          session_id?: string | null
+          sme_id?: string | null
           status: Database["public"]["Enums"]["attendance_status"]
           student_id?: string | null
         }
         Update: {
+          attendance_date?: string | null
           check_in_time?: string | null
           created_at?: string | null
           id?: string
           notes?: string | null
-          session_id?: string | null
+          sme_id?: string | null
           status?: Database["public"]["Enums"]["attendance_status"]
           student_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "attendance_session_id_fkey"
-            columns: ["session_id"]
+            foreignKeyName: "attendance_sme_id_fkey"
+            columns: ["sme_id"]
             isOneToOne: false
-            referencedRelation: "sessions"
+            referencedRelation: "smes"
             referencedColumns: ["id"]
           },
           {
@@ -415,6 +418,8 @@ export type Database = {
         Row: {
           bio: string | null
           created_at: string | null
+          department: string | null
+          employee_id: string | null
           experience_years: number | null
           id: string
           specialization: string
@@ -423,6 +428,8 @@ export type Database = {
         Insert: {
           bio?: string | null
           created_at?: string | null
+          department?: string | null
+          employee_id?: string | null
           experience_years?: number | null
           id: string
           specialization: string
@@ -431,6 +438,8 @@ export type Database = {
         Update: {
           bio?: string | null
           created_at?: string | null
+          department?: string | null
+          employee_id?: string | null
           experience_years?: number | null
           id?: string
           specialization?: string
