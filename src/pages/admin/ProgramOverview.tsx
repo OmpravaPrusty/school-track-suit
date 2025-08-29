@@ -52,7 +52,7 @@ const ProgramOverview = () => {
     {
       id: "sankalp90",
       title: "Sankalp 90",
-      description: "90-day skill development program for students",
+      description: "Skill development program for students",
       icon: GraduationCap,
       color: "bg-primary",
       route: "/admin/attendance", // Route to existing workflow
@@ -72,7 +72,7 @@ const ProgramOverview = () => {
     {
       id: "caci",
       title: "CACI",
-      description: "Community and Civic Initiatives Program",
+      description: "Computing and AI Course Implementation",
       icon: Users,
       color: "bg-accent",
       route: "/admin/programs/caci",
