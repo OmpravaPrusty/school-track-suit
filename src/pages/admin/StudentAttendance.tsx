@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Users, Clock, ArrowLeft } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Calendar, Users, Clock, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { format, startOfWeek, endOfWeek, add } from "date-fns";
 
 interface Student {
   id: string;
@@ -26,6 +28,7 @@ const StudentAttendance = () => {
   const navigate = useNavigate();
   const [selectedBatch, setSelectedBatch] = useState("");
   const [viewType, setViewType] = useState("");
+  const [referenceDate, setReferenceDate] = useState(new Date());
   const [batches, setBatches] = useState<Batch[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +48,7 @@ const StudentAttendance = () => {
     if (selectedBatch && viewType) {
       fetchStudentsAndAttendance();
     }
-  }, [selectedBatch, viewType]);
+  }, [selectedBatch, viewType, referenceDate]);
 
   const fetchBatches = async () => {
     try {
@@ -121,19 +124,24 @@ const StudentAttendance = () => {
 
   const generateDates = () => {
     if (!viewType) return [];
-    const today = new Date();
+    const baseDate = new Date(referenceDate);
     const dates = [];
     if (viewType === "day") {
-      dates.push(today);
+      dates.push(baseDate);
     } else if (viewType === "week") {
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(today.getDate() - i);
+      const currentDay = baseDate.getDay();
+      const firstDayOfWeek = new Date(baseDate);
+      firstDayOfWeek.setDate(baseDate.getDate() - currentDay);
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(firstDayOfWeek);
+        date.setDate(firstDayOfWeek.getDate() + i);
         dates.push(date);
       }
     } else if (viewType === "month") {
-      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      const year = baseDate.getFullYear();
+      const month = baseDate.getMonth();
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
       for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
         dates.push(new Date(d));
       }
@@ -201,11 +209,37 @@ const StudentAttendance = () => {
     return `${year}-${month}-${day}`;
   };
 
+  const formatDateRange = (date: Date, viewType: string) => {
+    if (viewType === 'day') {
+      return format(date, 'MMMM d, yyyy');
+    }
+    if (viewType === 'week') {
+      const start = startOfWeek(date);
+      const end = endOfWeek(date);
+      return `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`;
+    }
+    if (viewType === 'month') {
+      return format(date, 'MMMM yyyy');
+    }
+    return '';
+  };
+
   const isDateInFuture = (date: Date) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     date.setHours(0, 0, 0, 0);
     return date > today;
+  };
+
+  const handleDateNavigation = (direction: 'prev' | 'next') => {
+    const amount = direction === 'prev' ? -1 : 1;
+    if (viewType === 'day') {
+      setReferenceDate(add(referenceDate, { days: amount }));
+    } else if (viewType === 'week') {
+      setReferenceDate(add(referenceDate, { weeks: amount }));
+    } else if (viewType === 'month') {
+      setReferenceDate(add(referenceDate, { months: amount }));
+    }
   };
 
   return (
@@ -238,14 +272,14 @@ const StudentAttendance = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <label className="text-sm font-medium mb-2 block">Select Batch</label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+              <div className="md:col-span-1">
+                <Label className="text-sm font-medium mb-2 block">Select Batch</Label>
                 <Select value={selectedBatch} onValueChange={setSelectedBatch}>
                   <SelectTrigger>
                     <SelectValue placeholder="Choose batch" />
                   </SelectTrigger>
-                  <SelectContent className="bg-popover">
+                  <SelectContent>
                     {batches.map((batch) => (
                       <SelectItem key={batch.id} value={batch.id}>
                         {batch.name}
@@ -255,21 +289,32 @@ const StudentAttendance = () => {
                 </Select>
               </div>
             
-            <div className="flex-1">
-              <label className="text-sm font-medium mb-2 block">View Type</label>
-              <Select value={viewType} onValueChange={setViewType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose view type" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover">
-                  {viewTypes.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="md:col-span-1">
+                <Label className="text-sm font-medium mb-2 block">View Type</Label>
+                <Select value={viewType} onValueChange={setViewType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose view type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {viewTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-center md:justify-end gap-2">
+                <Button variant="outline" size="icon" onClick={() => handleDateNavigation('prev')}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm font-medium text-center w-48">
+                  {formatDateRange(referenceDate, viewType)}
+                </span>
+                <Button variant="outline" size="icon" onClick={() => handleDateNavigation('next')}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
           </div>
         </CardContent>
       </Card>
@@ -289,10 +334,10 @@ const StudentAttendance = () => {
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left p-3 font-medium text-foreground">Student</th>
-                    <th className="text-left p-3 font-medium text-foreground">Student ID</th>
+                    <th className="sticky left-0 bg-card p-3 text-left font-medium text-foreground z-10 w-48">Student</th>
+                    <th className="sticky bg-card p-3 text-left font-medium text-foreground z-10 w-32" style={{ left: '12rem' }}>Student ID</th>
                     {dates.map((date) => (
-                      <th key={date.toISOString()} className="text-center p-3 font-medium text-foreground">
+                      <th key={date.toISOString()} className="text-center p-3 font-medium text-foreground min-w-[100px]">
                         <div className="flex flex-col items-center gap-1">
                           <span className="text-xs">{formatDate(date)}</span>
                           {isDateInFuture(date) && (
@@ -308,8 +353,8 @@ const StudentAttendance = () => {
                 <tbody>
                    {students.map((student) => (
                      <tr key={student.id} className="border-b border-border/50 hover:bg-muted/30">
-                       <td className="p-3 font-medium text-foreground">{student.full_name}</td>
-                       <td className="p-3 text-muted-foreground">{student.students?.student_id || '-'}</td>
+                       <td className="sticky left-0 bg-card p-3 font-medium text-foreground">{student.full_name}</td>
+                       <td className="sticky bg-card p-3 text-muted-foreground" style={{ left: '12rem' }}>{student.students?.student_id || '-'}</td>
                       {dates.map((date) => {
                         const dateStr = formatDate(date);
                         const key = `${student.id}|${dateStr}`;

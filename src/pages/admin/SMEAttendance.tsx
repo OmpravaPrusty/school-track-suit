@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, GraduationCap, Clock, ArrowLeft, Loader2 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Calendar, GraduationCap, Clock, ArrowLeft, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, add, sub } from "date-fns";
 
 interface SME {
   id: string;
@@ -20,6 +22,7 @@ const SMEAttendance = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [viewType, setViewType] = useState("day");
+  const [referenceDate, setReferenceDate] = useState(new Date());
   const [smeList, setSmeList] = useState<SME[]>([]);
   const [dates, setDates] = useState<Date[]>([]);
   const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent'>>({});
@@ -36,18 +39,44 @@ const SMEAttendance = () => {
     return date.toISOString().split('T')[0];
   };
 
+  const formatDateRange = (date: Date, viewType: string) => {
+    if (viewType === 'day') {
+      return format(date, 'MMMM d, yyyy');
+    }
+    if (viewType === 'week') {
+      const start = startOfWeek(date);
+      const end = endOfWeek(date);
+      return `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`;
+    }
+    if (viewType === 'month') {
+      return format(date, 'MMMM yyyy');
+    }
+    return '';
+  };
+
+  const handleDateNavigation = (direction: 'prev' | 'next') => {
+    const amount = direction === 'prev' ? -1 : 1;
+    if (viewType === 'day') {
+      setReferenceDate(add(referenceDate, { days: amount }));
+    } else if (viewType === 'week') {
+      setReferenceDate(add(referenceDate, { weeks: amount }));
+    } else if (viewType === 'month') {
+      setReferenceDate(add(referenceDate, { months: amount }));
+    }
+  };
+
   const generateDates = useCallback(() => {
     if (!viewType) return [];
     
-    const today = new Date();
+    const baseDate = new Date(referenceDate);
     const newDates = [];
     
     if (viewType === "day") {
-      newDates.push(today);
+      newDates.push(baseDate);
     } else if (viewType === "week") {
-      const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
-      const firstDayOfWeek = new Date(today);
-      firstDayOfWeek.setDate(today.getDate() - currentDay);
+      const currentDay = baseDate.getDay();
+      const firstDayOfWeek = new Date(baseDate);
+      firstDayOfWeek.setDate(baseDate.getDate() - currentDay);
 
       for (let i = 0; i < 7; i++) {
         const date = new Date(firstDayOfWeek);
@@ -55,8 +84,8 @@ const SMEAttendance = () => {
         newDates.push(date);
       }
     } else if (viewType === "month") {
-      const year = today.getFullYear();
-      const month = today.getMonth();
+      const year = baseDate.getFullYear();
+      const month = baseDate.getMonth();
       const numDays = new Date(year, month + 1, 0).getDate();
       
       for (let i = 1; i <= numDays; i++) {
@@ -65,7 +94,7 @@ const SMEAttendance = () => {
     }
     
     return newDates;
-  }, [viewType]);
+  }, [viewType, referenceDate]);
 
   useEffect(() => {
     const fetchSMEs = async () => {
@@ -144,7 +173,7 @@ const SMEAttendance = () => {
     if (smeList.length > 0 && newDates.length > 0) {
       fetchAttendance(smeList.map(s => s.id), newDates);
     }
-  }, [viewType, smeList, generateDates, fetchAttendance]);
+  }, [viewType, smeList, referenceDate, generateDates, fetchAttendance]);
 
   const handleAttendanceToggle = (smeId: string, date: Date) => {
     const dateStr = formatDateForSupabase(date);
@@ -265,14 +294,14 @@ const SMEAttendance = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <label className="text-sm font-medium mb-2 block">View Type</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+            <div>
+              <Label className="text-sm font-medium mb-2 block">View Type</Label>
               <Select value={viewType} onValueChange={setViewType}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose view type" />
                 </SelectTrigger>
-                <SelectContent className="bg-popover">
+                <SelectContent>
                   {viewTypes.map((type) => (
                     <SelectItem key={type.value} value={type.value}>
                       {type.label}
@@ -280,6 +309,17 @@ const SMEAttendance = () => {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex items-center justify-center md:justify-end gap-2">
+              <Button variant="outline" size="icon" onClick={() => handleDateNavigation('prev')}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium text-center w-48">
+                {formatDateRange(referenceDate, viewType)}
+              </span>
+              <Button variant="outline" size="icon" onClick={() => handleDateNavigation('next')}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -307,11 +347,11 @@ const SMEAttendance = () => {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left p-3 font-medium text-foreground sticky left-0 bg-card z-10">SME Name</th>
-                      <th className="text-left p-3 font-medium text-foreground">Department</th>
-                      <th className="text-left p-3 font-medium text-foreground">Employee ID</th>
+                      <th className="sticky left-0 bg-card p-3 text-left font-medium text-foreground z-10 w-48">SME Name</th>
+                      <th className="p-3 text-left font-medium text-foreground">Department</th>
+                      <th className="p-3 text-left font-medium text-foreground">Employee ID</th>
                       {dates.map((date) => (
-                        <th key={date.toISOString()} className="text-center p-3 font-medium text-foreground">
+                        <th key={date.toISOString()} className="text-center p-3 font-medium text-foreground min-w-[100px]">
                           <div className="flex flex-col items-center gap-1">
                             <span className="text-xs font-semibold">{date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
                             <span className="text-sm">{formatDateForDisplay(date)}</span>
@@ -326,7 +366,7 @@ const SMEAttendance = () => {
                   <tbody>
                     {smeList.map((sme) => (
                       <tr key={sme.id} className="border-b border-border/50 hover:bg-muted/30">
-                        <td className="p-3 font-medium text-foreground sticky left-0 bg-card z-10">{sme.name}</td>
+                        <td className="sticky left-0 bg-card p-3 font-medium text-foreground">{sme.name}</td>
                         <td className="p-3 text-muted-foreground">{sme.department}</td>
                         <td className="p-3 text-muted-foreground">{sme.employee_id}</td>
                         {dates.map((date) => {
