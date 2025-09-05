@@ -1,4 +1,4 @@
-import { Home, Users, BookOpen, Bell, UserCheck, GraduationCap } from "lucide-react";
+import { Home, Users, BookOpen, Bell, UserCheck, GraduationCap, FilePenLine } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import {
   Sidebar,
@@ -42,6 +42,11 @@ const navigationItems = [
     title: "My Attendance",
     url: "/sme/attendance",
     icon: UserCheck,
+  },
+  {
+    title: "Assessment",
+    url: "/sme/assessment",
+    icon: FilePenLine,
   },
   {
     title: "Notifications",

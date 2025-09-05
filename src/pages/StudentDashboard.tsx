@@ -7,6 +7,7 @@ import StudentSessions from "./student/StudentSessions";
 import StudentCourses from "./student/StudentCourses";
 import StudentNotifications from "./student/StudentNotifications";
 import StudentDashboardHome from "./student/StudentDashboardHome";
+import StudentMarks from "./student/StudentMarks";
 
 const StudentDashboard = () => {
   return (
@@ -22,6 +23,7 @@ const StudentDashboard = () => {
                 <Route path="attendance" element={<StudentMyAttendancePage />} />
                 <Route path="sessions" element={<StudentSessions />} />
                 <Route path="courses" element={<StudentCourses />} />
+                <Route path="marks" element={<StudentMarks />} />
                 <Route path="notifications" element={<StudentNotifications />} />
                 <Route path="*" element={<Navigate to="/student" replace />} />
               </Routes>

@@ -1,4 +1,4 @@
-import { Home, CalendarCheck, Users, BookOpen, Bell } from "lucide-react";
+import { Home, CalendarCheck, Users, BookOpen, Bell, ClipboardCheck } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import {
   Sidebar,
@@ -32,6 +32,11 @@ const navigationItems = [
     title: "Courses",
     url: "/student/courses",
     icon: BookOpen,
+  },
+  {
+    title: "Marks",
+    url: "/student/marks",
+    icon: ClipboardCheck,
   },
   {
     title: "Notifications",
