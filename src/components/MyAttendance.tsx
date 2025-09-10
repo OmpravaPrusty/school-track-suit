@@ -23,7 +23,7 @@ interface MyAttendanceProps {
 }
 
 interface AttendanceRecord {
-  attendance_date: string;
+  check_in_time: string;
   status: 'present' | 'absent';
 }
 
@@ -43,10 +43,10 @@ const MyAttendance = ({ userId, userRole }: MyAttendanceProps) => {
 
       const query = supabase
         .from('attendance')
-        .select('attendance_date, status')
+        .select('check_in_time, status')
         .eq(userRole === 'student' ? 'student_id' : 'sme_id', userId)
-        .gte('attendance_date', format(from, 'yyyy-MM-dd'))
-        .lte('attendance_date', format(to, 'yyyy-MM-dd'));
+        .gte('check_in_time::date', format(from, 'yyyy-MM-dd'))
+        .lte('check_in_time::date', format(to, 'yyyy-MM-dd'));
 
       const { data, error: fetchError } = await query;
 
@@ -54,7 +54,10 @@ const MyAttendance = ({ userId, userRole }: MyAttendanceProps) => {
         console.error("Error fetching attendance:", fetchError);
         setError("Failed to load attendance data.");
       } else {
-        setAttendance(data as AttendanceRecord[] || []);
+        setAttendance((data || []).map((record: any) => ({
+          check_in_time: record.check_in_time?.split('T')[0] || '',
+          status: record.status
+        })));
       }
       setIsLoading(false);
     };
@@ -64,8 +67,8 @@ const MyAttendance = ({ userId, userRole }: MyAttendanceProps) => {
     }
   }, [userId, userRole, currentMonth]);
 
-  const presentDays = attendance.filter(d => d.status === 'present').map(d => parseUTCDate(d.attendance_date));
-  const absentDays = attendance.filter(d => d.status === 'absent').map(d => parseUTCDate(d.attendance_date));
+  const presentDays = attendance.filter(d => d.status === 'present').map(d => parseUTCDate(d.check_in_time));
+  const absentDays = attendance.filter(d => d.status === 'absent').map(d => parseUTCDate(d.check_in_time));
 
   const totalDaysInMonth = getDaysInMonth(currentMonth);
   const presentCount = presentDays.length;

@@ -109,16 +109,17 @@ const StudentAttendance = () => {
 
       const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance')
-        .select('student_id, status, attendance_date')
+        .select('student_id, status, check_in_time')
         .in('student_id', studentIds)
-        .gte('attendance_date', startDate)
-        .lte('attendance_date', endDate);
+        .gte('check_in_time::date', startDate)
+        .lte('check_in_time::date', endDate);
 
       if (attendanceError) throw attendanceError;
 
       const newAttendanceState: Record<string, 'present' | 'absent'> = {};
-      attendanceData.forEach(record => {
-        const key = `${record.student_id}|${record.attendance_date}`;
+      attendanceData.forEach((record: any) => {
+        const dateStr = record.check_in_time?.split('T')[0] || '';
+        const key = `${record.student_id}|${dateStr}`;
         newAttendanceState[key] = record.status as 'present' | 'absent';
       });
       setAttendance(newAttendanceState);
@@ -176,12 +177,12 @@ const StudentAttendance = () => {
       }
 
       const upsertData = attendanceChanges.map(([key, status]) => {
-        const [student_id, attendance_date] = key.split('|');
-        return { student_id, attendance_date, status, sme_id: null };
+        const [student_id, dateStr] = key.split('|');
+        return { student_id, check_in_time: `${dateStr}T09:00:00Z`, status, sme_id: null };
       });
 
       const { error } = await supabase.from('attendance').upsert(upsertData, {
-        onConflict: 'student_id, attendance_date',
+        onConflict: 'student_id, check_in_time',
       });
 
       if (error) throw error;
@@ -321,30 +322,52 @@ const StudentAttendance = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto rounded-md border">
+            <div className="overflow-x-auto rounded-lg border shadow-sm bg-gradient-to-br from-card to-card/50">
               <table className="border-collapse w-max">
                 <thead>
-                  <tr className="border-b border-border">
-                    <th className="sticky left-0 bg-card p-3 text-left font-medium text-foreground z-10 w-48">Student</th>
-                    <th className="sticky bg-card p-3 text-left font-medium text-foreground z-10 w-32" style={{ left: '12rem' }}>Student ID</th>
+                  <tr className="border-b border-border/60 bg-gradient-to-r from-muted/50 to-muted/30">
+                    <th className="sticky left-0 bg-gradient-to-r from-card to-card/90 backdrop-blur-sm p-4 text-left font-semibold text-foreground z-20 w-48 shadow-[2px_0_8px_-2px_hsl(var(--border))] border-r border-border/30">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-primary/60"></div>
+                        Student
+                      </div>
+                    </th>
+                    <th className="sticky bg-gradient-to-r from-card to-card/90 backdrop-blur-sm p-4 text-left font-semibold text-foreground z-10 w-32 shadow-[2px_0_8px_-2px_hsl(var(--border))] border-r border-border/30" style={{ left: '12rem' }}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-primary/40"></div>
+                        Student ID
+                      </div>
+                    </th>
                     {dates.map((date) => {
                       const dayOfWeek = date.getUTCDay();
                       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                      const isToday = formatDateAsUTC(date) === formatDateAsUTC(new Date());
                       return (
-                        <th key={date.toISOString()} className={`text-center p-3 font-medium text-foreground min-w-[80px] ${isWeekend && viewType === 'month' ? 'bg-muted/20' : ''}`}>
+                        <th key={date.toISOString()} className={`text-center p-4 font-medium text-foreground min-w-[90px] transition-all duration-300 ${
+                          isWeekend && viewType === 'month' 
+                            ? 'bg-gradient-to-b from-accent/10 to-accent/5 border-l border-accent/20' 
+                            : 'hover:bg-muted/20'
+                        } ${isToday ? 'bg-gradient-to-b from-primary/10 to-primary/5 border-l-2 border-primary/40' : ''}`}>
                           <div className="flex flex-col items-center gap-1">
                             {viewType === 'month' ? (
                               <>
-                                <span className="text-xs font-semibold">{format(date, 'E')}</span>
-                                <span className="text-lg font-bold">{date.getUTCDate()}</span>
+                                <span className={`text-xs font-bold tracking-wide ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>
+                                  {format(date, 'E')}
+                                </span>
+                                <span className={`text-xl font-bold ${isToday ? 'text-primary scale-110' : 'text-foreground'} transition-all duration-200`}>
+                                  {date.getUTCDate()}
+                                </span>
                               </>
                             ) : (
-                              <span className="text-xs">{formatDateAsUTC(date)}</span>
+                              <span className="text-xs font-medium">{formatDateAsUTC(date)}</span>
                             )}
                             {isDateInFuture(date) && (
-                              <Badge variant="secondary" className="text-xs px-1 py-0">
+                              <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-muted/50 text-muted-foreground border-0">
                                 Future
                               </Badge>
+                            )}
+                            {isToday && (
+                              <div className="w-2 h-0.5 bg-primary rounded-full mt-0.5"></div>
                             )}
                           </div>
                         </th>
@@ -352,11 +375,18 @@ const StudentAttendance = () => {
                     })}
                   </tr>
                 </thead>
-                <tbody>
-                   {students.map((student) => (
-                     <tr key={student.id} className="border-b border-border/50 hover:bg-muted/30">
-                       <td className="sticky left-0 bg-card p-3 font-medium text-foreground">{student.full_name}</td>
-                       <td className="sticky bg-card p-3 text-muted-foreground" style={{ left: '12rem' }}>{student.students?.student_id || '-'}</td>
+                 <tbody>
+                   {students.map((student, index) => (
+                     <tr key={student.id} className="border-b border-border/30 hover:bg-gradient-to-r hover:from-muted/20 hover:to-muted/10 transition-all duration-300 group">
+                       <td className="sticky left-0 bg-gradient-to-r from-card to-card/90 backdrop-blur-sm p-4 font-semibold text-foreground shadow-[2px_0_8px_-2px_hsl(var(--border))] border-r border-border/30 group-hover:shadow-[2px_0_12px_-2px_hsl(var(--border))] transition-all duration-300">
+                         <div className="flex items-center gap-3">
+                           <div className={`w-2 h-2 rounded-full ${index % 2 === 0 ? 'bg-primary/60' : 'bg-secondary/60'}`}></div>
+                           {student.full_name}
+                         </div>
+                       </td>
+                       <td className="sticky bg-gradient-to-r from-card to-card/90 backdrop-blur-sm p-4 text-muted-foreground font-medium shadow-[2px_0_8px_-2px_hsl(var(--border))] border-r border-border/30 group-hover:shadow-[2px_0_12px_-2px_hsl(var(--border))] transition-all duration-300" style={{ left: '12rem' }}>
+                         <span className="font-mono text-sm">{student.students?.student_id || '-'}</span>
+                       </td>
                       {dates.map((date) => {
                         const dateStr = formatDateAsUTC(date);
                         const key = `${student.id}|${dateStr}`;
@@ -365,17 +395,32 @@ const StudentAttendance = () => {
                         const future = isDateInFuture(date);
                         const dayOfWeek = date.getUTCDay();
                         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                        const isToday = formatDateAsUTC(date) === formatDateAsUTC(new Date());
                         
                          return (
-                           <td key={dateStr} className={`p-3 text-center ${isWeekend && viewType === 'month' ? 'bg-muted/20' : ''}`}>
+                           <td key={dateStr} className={`p-4 text-center transition-all duration-300 ${
+                             isWeekend && viewType === 'month' 
+                               ? 'bg-gradient-to-b from-accent/5 to-accent/2' 
+                               : 'hover:bg-muted/10'
+                           } ${isToday ? 'bg-gradient-to-b from-primary/5 to-primary/2' : ''}`}>
                              <div className="flex flex-col items-center gap-2">
                                <Switch
                                  checked={isPresent}
                                  onCheckedChange={() => handleAttendanceToggle(student.id, date)}
                                  disabled={future}
-                                 className="data-[state=checked]:bg-success"
+                                 className={`transition-all duration-300 ${
+                                   isPresent 
+                                     ? 'data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-green-500 data-[state=checked]:to-green-600 shadow-sm' 
+                                     : 'hover:scale-105'
+                                 }`}
                                />
-                               <span className={`text-xs ${future ? 'text-muted-foreground' : (isPresent ? 'text-success' : 'text-muted-foreground')}`}>
+                               <span className={`text-xs font-medium transition-all duration-200 ${
+                                 future 
+                                   ? 'text-muted-foreground/60' 
+                                   : isPresent 
+                                     ? 'text-green-600 font-semibold' 
+                                     : 'text-red-500'
+                               }`}>
                                  {future ? '-' : (isPresent ? 'Present' : 'Absent')}
                                </span>
                              </div>

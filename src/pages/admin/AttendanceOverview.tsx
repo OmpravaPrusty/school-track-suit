@@ -39,7 +39,8 @@ const AttendanceOverview = () => {
         const { data: attendanceData, error: attendanceError } = await supabase
           .from('attendance')
           .select('status')
-          .eq('attendance_date', today);
+          .gte('check_in_time::date', today)
+          .lt('check_in_time::date', format(new Date(Date.now() + 86400000), 'yyyy-MM-dd'));
 
         if (attendanceError) throw attendanceError;
 
