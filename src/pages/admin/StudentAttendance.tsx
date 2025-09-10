@@ -10,7 +10,6 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format, add, getDaysInMonth, startOfWeek, endOfWeek } from "date-fns";
-import { AttendanceTable } from "@/components/AttendanceTable";
 
 // Helper to create a date in UTC to avoid timezone issues
 const createUTCDate = (year: number, month: number, day: number): Date => {
@@ -110,17 +109,16 @@ const StudentAttendance = () => {
 
       const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance')
-        .select('student_id, status, check_in_time')
+        .select('student_id, status, attendance_date')
         .in('student_id', studentIds)
-        .gte('check_in_time::date', startDate)
-        .lte('check_in_time::date', endDate);
+        .gte('attendance_date', startDate)
+        .lte('attendance_date', endDate);
 
       if (attendanceError) throw attendanceError;
 
       const newAttendanceState: Record<string, 'present' | 'absent'> = {};
       attendanceData.forEach(record => {
-        const attendanceDate = record.check_in_time.split('T')[0]; // Extract date from timestamp
-        const key = `${record.student_id}|${attendanceDate}`;
+        const key = `${record.student_id}|${record.attendance_date}`;
         newAttendanceState[key] = record.status as 'present' | 'absent';
       });
       setAttendance(newAttendanceState);
@@ -179,17 +177,11 @@ const StudentAttendance = () => {
 
       const upsertData = attendanceChanges.map(([key, status]) => {
         const [student_id, attendance_date] = key.split('|');
-        return { 
-          student_id, 
-          status, 
-          check_in_time: `${attendance_date}T09:00:00`,
-          session_id: null,
-          notes: ''
-        };
+        return { student_id, attendance_date, status, sme_id: null };
       });
 
       const { error } = await supabase.from('attendance').upsert(upsertData, {
-        onConflict: 'student_id, check_in_time',
+        onConflict: 'student_id, attendance_date',
       });
 
       if (error) throw error;
@@ -329,20 +321,72 @@ const StudentAttendance = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <AttendanceTable
-              viewType={viewType}
-              dates={dates}
-              data={students.map(student => ({
-                id: student.id,
-                name: student.full_name,
-                identifier: student.students?.student_id || '-',
-                identifierLabel: 'Student ID'
-              }))}
-              attendance={attendance}
-              onAttendanceToggle={handleAttendanceToggle}
-              isDateInFuture={isDateInFuture}
-              formatDateAsUTC={formatDateAsUTC}
-            />
+            <div className="overflow-x-auto rounded-md border">
+              <table className="border-collapse w-max">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="sticky left-0 bg-card p-3 text-left font-medium text-foreground z-10 w-48">Student</th>
+                    <th className="sticky bg-card p-3 text-left font-medium text-foreground z-10 w-32" style={{ left: '12rem' }}>Student ID</th>
+                    {dates.map((date) => {
+                      const dayOfWeek = date.getUTCDay();
+                      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                      return (
+                        <th key={date.toISOString()} className={`text-center p-3 font-medium text-foreground min-w-[80px] ${isWeekend && viewType === 'month' ? 'bg-muted/20' : ''}`}>
+                          <div className="flex flex-col items-center gap-1">
+                            {viewType === 'month' ? (
+                              <>
+                                <span className="text-xs font-semibold">{format(date, 'E')}</span>
+                                <span className="text-lg font-bold">{date.getUTCDate()}</span>
+                              </>
+                            ) : (
+                              <span className="text-xs">{formatDateAsUTC(date)}</span>
+                            )}
+                            {isDateInFuture(date) && (
+                              <Badge variant="secondary" className="text-xs px-1 py-0">
+                                Future
+                              </Badge>
+                            )}
+                          </div>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                   {students.map((student) => (
+                     <tr key={student.id} className="border-b border-border/50 hover:bg-muted/30">
+                       <td className="sticky left-0 bg-card p-3 font-medium text-foreground">{student.full_name}</td>
+                       <td className="sticky bg-card p-3 text-muted-foreground" style={{ left: '12rem' }}>{student.students?.student_id || '-'}</td>
+                      {dates.map((date) => {
+                        const dateStr = formatDateAsUTC(date);
+                        const key = `${student.id}|${dateStr}`;
+                        const status = attendance[key] || 'absent';
+                        const isPresent = status === 'present';
+                        const future = isDateInFuture(date);
+                        const dayOfWeek = date.getUTCDay();
+                        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                        
+                         return (
+                           <td key={dateStr} className={`p-3 text-center ${isWeekend && viewType === 'month' ? 'bg-muted/20' : ''}`}>
+                             <div className="flex flex-col items-center gap-2">
+                               <Switch
+                                 checked={isPresent}
+                                 onCheckedChange={() => handleAttendanceToggle(student.id, date)}
+                                 disabled={future}
+                                 className="data-[state=checked]:bg-success"
+                               />
+                               <span className={`text-xs ${future ? 'text-muted-foreground' : (isPresent ? 'text-success' : 'text-muted-foreground')}`}>
+                                 {future ? '-' : (isPresent ? 'Present' : 'Absent')}
+                               </span>
+                             </div>
+                           </td>
+                         );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             
             <div className="mt-6 flex justify-end">
               <Button 

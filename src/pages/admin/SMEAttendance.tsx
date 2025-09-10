@@ -8,9 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Calendar, GraduationCap, Clock, ArrowLeft, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { format, add, getDaysInMonth, startOfWeek, endOfWeek } from "date-fns";
-import { AttendanceTable } from "@/components/AttendanceTable";
 
 // Helper to create a date in UTC to avoid timezone issues
 const createUTCDate = (year: number, month: number, day: number): Date => {
@@ -28,11 +27,13 @@ const formatDateAsUTC = (date: Date): string => {
 interface SME {
   id: string;
   name: string;
-  specialization: string;
+  department: string;
+  employee_id: string;
 }
 
 const SMEAttendance = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [viewType, setViewType] = useState("day");
   const [referenceDate, setReferenceDate] = useState(new Date());
   const [smeList, setSmeList] = useState<SME[]>([]);
@@ -80,14 +81,15 @@ const SMEAttendance = () => {
     try {
       const { data: smeData, error: smeError } = await supabase
         .from('smes')
-        .select('id, specialization, profiles(full_name)');
+        .select('id, employee_id, department, profile:profiles(full_name)');
 
       if (smeError) throw smeError;
 
       const formattedSMEs = smeData.map(sme => ({
         id: sme.id,
-        name: sme.profiles?.full_name || 'N/A',
-        specialization: sme.specialization || 'General',
+        name: sme.profile?.full_name || 'N/A',
+        department: sme.department,
+        employee_id: sme.employee_id,
       }));
       setSmeList(formattedSMEs);
 
@@ -101,23 +103,22 @@ const SMEAttendance = () => {
       const startDate = formatDateAsUTC(dates[0]);
       const endDate = formatDateAsUTC(dates[dates.length - 1]);
 
-      // For now, return empty attendance data as SME attendance might need different table structure
-      const attendanceData: any[] = [];
-      // const { data: attendanceData, error: attendanceError } = await supabase
-      //   .from('attendance')
-      //   .select('check_in_time, status')
-      //   .in('student_id', smeIds)
-      //   .gte('check_in_time::date', startDate)
-      //   .lte('check_in_time::date', endDate);
+      const { data: attendanceData, error: attendanceError } = await supabase
+        .from('attendance')
+        .select('sme_id, attendance_date, status')
+        .in('sme_id', smeIds)
+        .gte('attendance_date', startDate)
+        .lte('attendance_date', endDate);
 
-      // if (attendanceError) throw attendanceError;
+      if (attendanceError) throw attendanceError;
 
       const newAttendance: Record<string, 'present' | 'absent'> = {};
-      // attendanceData.forEach(record => {
-      //   const attendanceDate = record.check_in_time.split('T')[0];
-      //   const key = `${record.student_id}|${attendanceDate}`;
-      //   newAttendance[key] = record.status as 'present' | 'absent';
-      // });
+      attendanceData.forEach(record => {
+        if (record.sme_id) {
+          const key = `${record.sme_id}|${record.attendance_date}`;
+          newAttendance[key] = record.status as 'present' | 'absent';
+        }
+      });
       setAttendance(newAttendance);
 
     } catch (error: any) {
@@ -155,24 +156,14 @@ const SMEAttendance = () => {
         return;
       }
 
-      // For now, just simulate success - actual implementation needs proper SME attendance table
-      // const upsertData = attendanceChanges.map(([key, status]) => {
-      //   const [sme_id, attendance_date] = key.split('|');
-      //   return { 
-      //     student_id: sme_id, 
-      //     status, 
-      //     check_in_time: `${attendance_date}T09:00:00`,
-      //     session_id: null,
-      //     notes: 'SME Attendance'
-      //   };
-      // });
+      const upsertData = attendanceChanges.map(([key, status]) => {
+        const [sme_id, attendance_date] = key.split('|');
+        return { sme_id, attendance_date, status, student_id: null };
+      });
 
-      // const { error } = await supabase.from('attendance').upsert(upsertData, {
-      //   onConflict: 'student_id, check_in_time',
-      // });
-
-      // if (error) throw error;
-      const error = null; // Simulate success for now
+      const { error } = await supabase.from('attendance').upsert(upsertData, {
+        onConflict: 'sme_id, attendance_date',
+      });
 
       if (error) throw error;
 
@@ -304,20 +295,72 @@ const SMEAttendance = () => {
             ) : smeList.length === 0 ? (
               <p className="text-center text-muted-foreground py-10">No SMEs found.</p>
             ) : (
-              <AttendanceTable
-                viewType={viewType}
-                dates={dates}
-                data={smeList.map(sme => ({
-                  id: sme.id,
-                  name: sme.name,
-                  identifier: sme.specialization,
-                  identifierLabel: 'Specialization'
-                }))}
-                attendance={attendance}
-                onAttendanceToggle={handleAttendanceToggle}
-                isDateInFuture={isDateInFuture}
-                formatDateAsUTC={formatDateAsUTC}
-              />
+              <div className="overflow-x-auto rounded-md border">
+                <table className="border-collapse w-max">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="sticky left-0 bg-card p-3 text-left font-medium text-foreground z-10 w-48">SME Name</th>
+                      <th className="sticky bg-card p-3 text-left font-medium text-foreground z-10 w-40" style={{ left: '12rem' }}>Department</th>
+                      <th className="sticky bg-card p-3 text-left font-medium text-foreground z-10 w-32" style={{ left: '22rem' }}>Employee ID</th>
+                      {dates.map((date) => {
+                        const dayOfWeek = date.getUTCDay();
+                        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                        return (
+                          <th key={date.toISOString()} className={`text-center p-3 font-medium text-foreground min-w-[80px] ${isWeekend && viewType === 'month' ? 'bg-muted/20' : ''}`}>
+                            <div className="flex flex-col items-center gap-1">
+                              {viewType === 'month' ? (
+                                <>
+                                  <span className="text-xs font-semibold">{format(date, 'E')}</span>
+                                  <span className="text-lg font-bold">{date.getUTCDate()}</span>
+                                </>
+                              ) : (
+                                <span className="text-xs">{formatDateAsUTC(date)}</span>
+                              )}
+                              {isDateInFuture(date) && (
+                                <Badge variant="secondary" className="text-xs px-1 py-0">Future</Badge>
+                              )}
+                            </div>
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {smeList.map((sme) => (
+                      <tr key={sme.id} className="border-b border-border/50 hover:bg-muted/30">
+                        <td className="sticky left-0 bg-card p-3 font-medium text-foreground">{sme.name}</td>
+                        <td className="sticky bg-card p-3 text-muted-foreground" style={{ left: '12rem' }}>{sme.department}</td>
+                        <td className="sticky bg-card p-3 text-muted-foreground" style={{ left: '22rem' }}>{sme.employee_id}</td>
+                        {dates.map((date) => {
+                          const dateStr = formatDateAsUTC(date);
+                          const key = `${sme.id}|${dateStr}`;
+                          const status = attendance[key] || 'absent';
+                          const isPresent = status === 'present';
+                          const future = isDateInFuture(date);
+                          const dayOfWeek = date.getUTCDay();
+                          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+                          return (
+                            <td key={key} className={`p-3 text-center ${isWeekend && viewType === 'month' ? 'bg-muted/20' : ''}`}>
+                              <div className="flex flex-col items-center gap-2">
+                                <Switch
+                                  checked={isPresent}
+                                  onCheckedChange={() => handleAttendanceToggle(sme.id, date)}
+                                  disabled={future}
+                                  className="data-[state=checked]:bg-success"
+                                />
+                                <span className={`text-xs ${future ? 'text-muted-foreground' : (isPresent ? 'text-success' : 'text-muted-foreground')}`}>
+                                  {future ? '-' : (isPresent ? 'Present' : 'Absent')}
+                                </span>
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
             
             <div className="mt-6 flex justify-end">

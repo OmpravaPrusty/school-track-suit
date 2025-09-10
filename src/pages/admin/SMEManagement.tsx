@@ -1,25 +1,28 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { GraduationCap, Plus, Edit2, Trash2, UserCheck } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, Edit, Trash2, Search, Users } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+
+const subjects = ['English', 'Math', 'BIO', 'PHY', 'CHEM', 'AI', 'CS'];
 
 interface SME {
   id: string;
   full_name: string;
   email: string;
   phone: string;
+  department: string;
   employee_id: string;
-  bio: string;
-  experience_years: number;
   status: "active" | "inactive";
+  sme_subjects: { subject: string }[];
+  sme_batches: { batch_id: string }[];
 }
 
 interface Batch {
@@ -30,47 +33,54 @@ interface Batch {
 const SMEManagement = () => {
   const [smes, setSMEs] = useState<SME[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSME, setEditingSME] = useState<SME | null>(null);
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
     phone: "",
+    department: "",
     employee_id: "",
-    bio: "",
-    experience_years: 0,
+    password: "",
+    subject_names: [] as string[],
     batch_ids: [] as string[],
   });
 
   useEffect(() => {
-    fetchSMEs();
+    fetchData();
   }, []);
 
-  const fetchSMEs = async () => {
+  const generateRandomPassword = () => {
+    return Math.random().toString(36).slice(-8);
+  };
+
+  const fetchData = async () => {
     try {
       setLoading(true);
-
+      
       const { data: smesData, error: smesError } = await supabase
         .from('smes')
         .select(`
           id,
-          bio,
-          experience_years,
-          created_at,
-          updated_at,
-          profiles:id (
+          department,
+          employee_id,
+          profiles!inner (
             full_name,
             email,
             phone,
             status
+          ),
+          sme_subjects (
+            subject
+          ),
+          sme_batches (
+            batch_id
           )
         `);
 
-      if (smesError) {
-        console.error('Query error:', smesError);
-        throw smesError;
-      }
+      if (smesError) throw smesError;
 
       const { data: batchesData, error: batchesError } = await supabase
         .from('batches')
@@ -81,21 +91,22 @@ const SMEManagement = () => {
 
       const formattedSMEs = smesData?.map(sme => ({
         id: sme.id,
-        full_name: sme.profiles?.full_name || '',
-        email: sme.profiles?.email || '',
-        phone: sme.profiles?.phone || '',
-        employee_id: '', // Not available in current schema
-        bio: sme.bio || '',
-        experience_years: sme.experience_years || 0,
-        status: (sme.profiles?.status as "active" | "inactive") || "active",
+        full_name: sme.profiles.full_name,
+        email: sme.profiles.email,
+        phone: sme.profiles.phone || '',
+        department: sme.department || '',
+        employee_id: sme.employee_id || '',
+        status: sme.profiles.status as "active" | "inactive",
+        sme_subjects: sme.sme_subjects,
+        sme_batches: sme.sme_batches,
       })) || [];
 
       setSMEs(formattedSMEs);
     } catch (error) {
-      console.error('Error fetching SMEs:', error);
+      console.error('Error fetching data:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch SMEs",
+        description: "Failed to fetch data",
         variant: "destructive",
       });
     } finally {
@@ -103,7 +114,18 @@ const SMEManagement = () => {
     }
   };
 
-  const handleSave = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.full_name || !formData.email || formData.subject_names.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields and select at least one subject.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       if (editingSME) {
         // Update existing SME
@@ -115,34 +137,69 @@ const SMEManagement = () => {
 
         const { error: smeError } = await supabase
           .from('smes')
-          .update({ 
-            bio: formData.bio,
-            experience_years: formData.experience_years
-          })
+          .update({ department: formData.department, employee_id: formData.employee_id })
           .eq('id', editingSME.id);
         if (smeError) throw smeError;
 
+        // Update subjects
+        await supabase.from('sme_subjects').delete().eq('sme_id', editingSME.id);
+        const subjectInsert = formData.subject_names.map(subject => ({ sme_id: editingSME.id, subject }));
+        const { error: subjectError } = await supabase.from('sme_subjects').insert(subjectInsert);
+        if (subjectError) throw subjectError;
+
+        // Update batches
+        await supabase.from('sme_batches').delete().eq('sme_id', editingSME.id);
+        const batchInsert = formData.batch_ids.map(batch_id => ({ sme_id: editingSME.id, batch_id }));
+        const { error: batchError } = await supabase.from('sme_batches').insert(batchInsert);
+        if (batchError) throw batchError;
+
         toast({ title: "Success", description: "SME updated successfully" });
       } else {
-        // Create new SME - simplified version since sme_subjects and sme_batches tables aren't accessible
-        toast({ 
-          title: "Info", 
-          description: "SME creation functionality needs to be implemented with proper authentication flow" 
+        // Create new SME
+        const password = formData.password || generateRandomPassword();
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: formData.email,
+          password: password,
+          options: { data: { full_name: formData.full_name, phone: formData.phone } }
         });
+        if (authError) throw authError;
+        if (!authData.user) throw new Error('Failed to create user');
+
+        const smeId = authData.user.id;
+        const { error: smeError } = await supabase
+          .from('smes')
+          .insert({ id: smeId, department: formData.department, employee_id: formData.employee_id });
+        if (smeError) throw smeError;
+
+        const { error: roleError } = await supabase.from('user_roles').insert({ user_id: smeId, role: 'sme' });
+        if (roleError) throw roleError;
+
+        const subjectInsert = formData.subject_names.map(subject => ({ sme_id: smeId, subject }));
+        const { error: subjectError } = await supabase.from('sme_subjects').insert(subjectInsert);
+        if (subjectError) throw subjectError;
+
+        const batchInsert = formData.batch_ids.map(batch_id => ({ sme_id: smeId, batch_id }));
+        const { error: batchError } = await supabase.from('sme_batches').insert(batchInsert);
+        if (batchError) throw batchError;
+
+        toast({ title: "Success", description: `SME created successfully. Password: ${password}` });
       }
 
-      setIsDialogOpen(false);
-      setEditingSME(null);
       resetForm();
-      fetchSMEs();
+      fetchData();
     } catch (error: any) {
-      console.error('Error saving SME:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to save SME",
-        variant: "destructive",
-      });
+      console.error('Error handling SME:', error);
+      toast({ title: "Error", description: error.message || "Failed to process SME", variant: "destructive" });
     }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      full_name: "", email: "", phone: "", department: "", employee_id: "", password: "",
+      subject_names: [], batch_ids: []
+    });
+    setEditingSME(null);
+    setIsDialogOpen(false);
   };
 
   const handleEdit = (sme: SME) => {
@@ -151,198 +208,215 @@ const SMEManagement = () => {
       full_name: sme.full_name,
       email: sme.email,
       phone: sme.phone,
+      department: sme.department,
       employee_id: sme.employee_id,
-      bio: sme.bio,
-      experience_years: sme.experience_years,
-      batch_ids: [],
+      password: "",
+      subject_names: sme.sme_subjects.map(s => s.subject),
+      batch_ids: sme.sme_batches.map(b => b.batch_id),
     });
     setIsDialogOpen(true);
   };
 
-  const handleDelete = async (sme: SME) => {
-    if (!confirm('Are you sure you want to delete this SME?')) return;
-
+  const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('smes')
-        .delete()
-        .eq('id', sme.id);
-
+      const { error } = await supabase.functions.invoke('delete-user', { body: { userId: id } });
       if (error) throw error;
-
       toast({ title: "Success", description: "SME deleted successfully" });
-      fetchSMEs();
+      fetchData();
     } catch (error: any) {
       console.error('Error deleting SME:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete SME",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to delete SME", variant: "destructive" });
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      full_name: "",
-      email: "",
-      phone: "",
-      employee_id: "",
-      bio: "",
-      experience_years: 0,
-      batch_ids: [],
-    });
-  };
-
-  const openCreateDialog = () => {
-    setEditingSME(null);
-    resetForm();
-    setIsDialogOpen(true);
-  };
+  const filteredSMEs = smes.filter(sme =>
+    sme.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    sme.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    sme.sme_subjects.some(s => s.subject.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="text-lg">Loading SMEs...</div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-lg bg-primary/10">
-            <GraduationCap className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">SME Management</h1>
-            <p className="text-muted-foreground">Manage Subject Matter Experts</p>
-          </div>
+      <div className="flex items-center gap-3">
+        <div className="p-3 rounded-lg bg-secondary/10">
+          <Users className="h-6 w-6 text-primary" />
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">SME Management</h1>
+          <p className="text-muted-foreground">Manage Subject Matter Experts and their expertise areas</p>
+        </div>
+      </div>
+
+      <div className="flex justify-between items-center">
+        <div className="relative w-96">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search SMEs by name, email, or specialization..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Dialog open={isDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) resetForm(); else setIsDialogOpen(true); }}>
           <DialogTrigger asChild>
-            <Button onClick={openCreateDialog} className="flex items-center gap-2">
+            <Button className="gap-2">
               <Plus className="h-4 w-4" />
               Add SME
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>{editingSME ? 'Edit SME' : 'Add New SME'}</DialogTitle>
-            </DialogHeader>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="full_name">Full Name</Label>
-                <Input
-                  id="full_name"
-                  value={formData.full_name}
-                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                />
+          <DialogContent className="max-w-3xl">
+            <form onSubmit={handleSubmit}>
+              <DialogHeader>
+                <DialogTitle>{editingSME ? "Edit SME" : "Add New SME"}</DialogTitle>
+                <DialogDescription>Enter SME information, assign subjects, and batches.</DialogDescription>
+              </DialogHeader>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="full_name">Full Name *</Label>
+                  <Input id="full_name" value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} placeholder="Enter full name" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="Enter email address" required disabled={!!editingSME} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="Enter phone number" />
+                </div>
+                 <div className="space-y-2">
+                  <Label htmlFor="department">Department</Label>
+                  <Input id="department" value={formData.department} onChange={(e) => setFormData({ ...formData, department: e.target.value })} placeholder="Enter department" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="employee_id">Employee ID</Label>
+                  <Input id="employee_id" value={formData.employee_id} onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })} placeholder="Enter employee ID" />
+                </div>
+                {!editingSME && (
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password (leave empty for auto-generation)</Label>
+                    <Input id="password" type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="Enter password or leave empty" />
+                  </div>
+                )}
               </div>
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  disabled={!!editingSME}
-                />
+              <div className="grid grid-cols-2 gap-6 mt-4">
+                <div className="space-y-3">
+                  <Label className="font-semibold">Subjects *</Label>
+                  <div className="grid grid-cols-2 gap-2 p-4 border rounded-md">
+                    {subjects.map(subject => (
+                      <div key={subject} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`subject-${subject}`}
+                          checked={formData.subject_names.includes(subject)}
+                          onCheckedChange={(checked) => {
+                            const newSubjects = checked
+                              ? [...formData.subject_names, subject]
+                              : formData.subject_names.filter(s => s !== subject);
+                            setFormData({ ...formData, subject_names: newSubjects });
+                          }}
+                        />
+                        <Label htmlFor={`subject-${subject}`} className="font-normal">{subject}</Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <Label className="font-semibold">Batches</Label>
+                  <div className="p-4 border rounded-md max-h-48 overflow-y-auto">
+                    {batches.map(batch => (
+                      <div key={batch.id} className="flex items-center gap-2 mb-2">
+                        <Checkbox
+                          id={`batch-${batch.id}`}
+                          checked={formData.batch_ids.includes(batch.id)}
+                          onCheckedChange={(checked) => {
+                            const newBatches = checked
+                              ? [...formData.batch_ids, batch.id]
+                              : formData.batch_ids.filter(b => b !== batch.id);
+                            setFormData({ ...formData, batch_ids: newBatches });
+                          }}
+                        />
+                        <Label htmlFor={`batch-${batch.id}`} className="font-normal">{batch.name}</Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="employee_id">Employee ID</Label>
-                <Input
-                  id="employee_id"
-                  value={formData.employee_id}
-                  onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="experience_years">Experience (Years)</Label>
-                <Input
-                  id="experience_years"
-                  type="number"
-                  value={formData.experience_years}
-                  onChange={(e) => setFormData({ ...formData, experience_years: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-              <div className="col-span-2">
-                <Label htmlFor="bio">Bio</Label>
-                <Textarea
-                  id="bio"
-                  value={formData.bio}
-                  onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                  rows={3}
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSave}>
-                {editingSME ? 'Update' : 'Create'} SME
-              </Button>
-            </div>
+              <DialogFooter className="mt-6">
+                <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
+                <Button type="submit">{editingSME ? "Update" : "Add"} SME</Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Subject Matter Experts</CardTitle>
+          <CardTitle>SME Directory</CardTitle>
+          <CardDescription>Subject Matter Experts and their areas of expertise</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4">
-            {smes.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8">
-                No SMEs found. Add your first SME to get started.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {smes.map((sme) => (
-                  <Card key={sme.id} className="relative">
-                    <CardHeader className="pb-2">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-lg">{sme.full_name}</CardTitle>
-                          <p className="text-sm text-muted-foreground">{sme.email}</p>
-                        </div>
-                        <Badge variant={sme.status === 'active' ? 'default' : 'secondary'}>
-                          {sme.status}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Subjects</TableHead>
+                <TableHead>Batches</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredSMEs.map((sme) => (
+                <TableRow key={sme.id}>
+                  <TableCell className="font-medium">{sme.full_name}</TableCell>
+                  <TableCell>{sme.email}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {sme.sme_subjects.map(s => <Badge key={s.subject} variant="secondary">{s.subject}</Badge>)}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {sme.sme_batches.map(b => (
+                        <Badge key={b.batch_id} variant="outline">
+                          {batches.find(batch => batch.id === b.batch_id)?.name || 'Deleted Batch'}
                         </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2 text-sm">
-                        <p><strong>Employee ID:</strong> {sme.employee_id}</p>
-                        <p><strong>Phone:</strong> {sme.phone}</p>
-                        <p><strong>Experience:</strong> {sme.experience_years} years</p>
-                        {sme.bio && <p><strong>Bio:</strong> {sme.bio}</p>}
-                      </div>
-                      <div className="flex justify-end gap-2 mt-4">
-                        <Button variant="outline" size="sm" onClick={() => handleEdit(sme)}>
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDelete(sme)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={sme.status === "active" ? "default" : "secondary"}>
+                      {sme.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="icon" onClick={() => handleEdit(sme)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="icon" onClick={() => handleDelete(sme.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {filteredSMEs.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              No SMEs found
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
