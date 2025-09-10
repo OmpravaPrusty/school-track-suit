@@ -81,15 +81,15 @@ const SMEAttendance = () => {
     try {
       const { data: smeData, error: smeError } = await supabase
         .from('smes')
-        .select('id, employee_id, bio, profiles(full_name)');
+        .select('id, employee_id, department, profile:profiles(full_name)');
 
       if (smeError) throw smeError;
 
-      const formattedSMEs = smeData.map((sme: any) => ({
+      const formattedSMEs = smeData.map(sme => ({
         id: sme.id,
-        name: sme.profiles?.full_name || 'N/A',
-        department: sme.bio || 'N/A',
-        employee_id: sme.employee_id || 'N/A',
+        name: sme.profile?.full_name || 'N/A',
+        department: sme.department,
+        employee_id: sme.employee_id,
       }));
       setSmeList(formattedSMEs);
 
@@ -105,18 +105,17 @@ const SMEAttendance = () => {
 
       const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance')
-        .select('sme_id, check_in_time, status')
+        .select('sme_id, attendance_date, status')
         .in('sme_id', smeIds)
-        .gte('check_in_time::date', startDate)
-        .lte('check_in_time::date', endDate);
+        .gte('attendance_date', startDate)
+        .lte('attendance_date', endDate);
 
       if (attendanceError) throw attendanceError;
 
       const newAttendance: Record<string, 'present' | 'absent'> = {};
-      attendanceData.forEach((record: any) => {
-        if (record.sme_id && record.check_in_time) {
-          const dateStr = record.check_in_time.split('T')[0];
-          const key = `${record.sme_id}|${dateStr}`;
+      attendanceData.forEach(record => {
+        if (record.sme_id) {
+          const key = `${record.sme_id}|${record.attendance_date}`;
           newAttendance[key] = record.status as 'present' | 'absent';
         }
       });
@@ -158,12 +157,12 @@ const SMEAttendance = () => {
       }
 
       const upsertData = attendanceChanges.map(([key, status]) => {
-        const [sme_id, dateStr] = key.split('|');
-        return { sme_id, check_in_time: `${dateStr}T09:00:00Z`, status, student_id: null };
+        const [sme_id, attendance_date] = key.split('|');
+        return { sme_id, attendance_date, status, student_id: null };
       });
 
       const { error } = await supabase.from('attendance').upsert(upsertData, {
-        onConflict: 'sme_id, check_in_time',
+        onConflict: 'sme_id, attendance_date',
       });
 
       if (error) throw error;
@@ -296,58 +295,29 @@ const SMEAttendance = () => {
             ) : smeList.length === 0 ? (
               <p className="text-center text-muted-foreground py-10">No SMEs found.</p>
             ) : (
-              <div className="overflow-x-auto rounded-lg border shadow-sm bg-gradient-to-br from-card to-card/50">
+              <div className="overflow-x-auto rounded-md border">
                 <table className="border-collapse w-max">
                   <thead>
-                    <tr className="border-b border-border/60 bg-gradient-to-r from-muted/50 to-muted/30">
-                      <th className="sticky left-0 bg-gradient-to-r from-card to-card/90 backdrop-blur-sm p-4 text-left font-semibold text-foreground z-20 w-48 shadow-[2px_0_8px_-2px_hsl(var(--border))] border-r border-border/30">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-primary/60"></div>
-                          SME Name
-                        </div>
-                      </th>
-                      <th className="sticky bg-gradient-to-r from-card to-card/90 backdrop-blur-sm p-4 text-left font-semibold text-foreground z-10 w-40 shadow-[2px_0_8px_-2px_hsl(var(--border))] border-r border-border/30" style={{ left: '12rem' }}>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-primary/40"></div>
-                          Department
-                        </div>
-                      </th>
-                      <th className="sticky bg-gradient-to-r from-card to-card/90 backdrop-blur-sm p-4 text-left font-semibold text-foreground z-10 w-32 shadow-[2px_0_8px_-2px_hsl(var(--border))] border-r border-border/30" style={{ left: '22rem' }}>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-primary/20"></div>
-                          Employee ID
-                        </div>
-                      </th>
+                    <tr className="border-b border-border">
+                      <th className="sticky left-0 bg-card p-3 text-left font-medium text-foreground z-10 w-48">SME Name</th>
+                      <th className="sticky bg-card p-3 text-left font-medium text-foreground z-10 w-40" style={{ left: '12rem' }}>Department</th>
+                      <th className="sticky bg-card p-3 text-left font-medium text-foreground z-10 w-32" style={{ left: '22rem' }}>Employee ID</th>
                       {dates.map((date) => {
                         const dayOfWeek = date.getUTCDay();
                         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                        const isToday = formatDateAsUTC(date) === formatDateAsUTC(new Date());
                         return (
-                          <th key={date.toISOString()} className={`text-center p-4 font-medium text-foreground min-w-[90px] transition-all duration-300 ${
-                            isWeekend && viewType === 'month' 
-                              ? 'bg-gradient-to-b from-accent/10 to-accent/5 border-l border-accent/20' 
-                              : 'hover:bg-muted/20'
-                          } ${isToday ? 'bg-gradient-to-b from-primary/10 to-primary/5 border-l-2 border-primary/40' : ''}`}>
+                          <th key={date.toISOString()} className={`text-center p-3 font-medium text-foreground min-w-[80px] ${isWeekend && viewType === 'month' ? 'bg-muted/20' : ''}`}>
                             <div className="flex flex-col items-center gap-1">
                               {viewType === 'month' ? (
                                 <>
-                                  <span className={`text-xs font-bold tracking-wide ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>
-                                    {format(date, 'E')}
-                                  </span>
-                                  <span className={`text-xl font-bold ${isToday ? 'text-primary scale-110' : 'text-foreground'} transition-all duration-200`}>
-                                    {date.getUTCDate()}
-                                  </span>
+                                  <span className="text-xs font-semibold">{format(date, 'E')}</span>
+                                  <span className="text-lg font-bold">{date.getUTCDate()}</span>
                                 </>
                               ) : (
-                                <span className="text-xs font-medium">{formatDateAsUTC(date)}</span>
+                                <span className="text-xs">{formatDateAsUTC(date)}</span>
                               )}
                               {isDateInFuture(date) && (
-                                <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-muted/50 text-muted-foreground border-0">
-                                  Future
-                                </Badge>
-                              )}
-                              {isToday && (
-                                <div className="w-2 h-0.5 bg-primary rounded-full mt-0.5"></div>
+                                <Badge variant="secondary" className="text-xs px-1 py-0">Future</Badge>
                               )}
                             </div>
                           </th>
@@ -356,20 +326,11 @@ const SMEAttendance = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {smeList.map((sme, index) => (
-                      <tr key={sme.id} className="border-b border-border/30 hover:bg-gradient-to-r hover:from-muted/20 hover:to-muted/10 transition-all duration-300 group">
-                        <td className="sticky left-0 bg-gradient-to-r from-card to-card/90 backdrop-blur-sm p-4 font-semibold text-foreground shadow-[2px_0_8px_-2px_hsl(var(--border))] border-r border-border/30 group-hover:shadow-[2px_0_12px_-2px_hsl(var(--border))] transition-all duration-300">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-2 h-2 rounded-full ${index % 2 === 0 ? 'bg-primary/60' : 'bg-secondary/60'}`}></div>
-                            {sme.name}
-                          </div>
-                        </td>
-                        <td className="sticky bg-gradient-to-r from-card to-card/90 backdrop-blur-sm p-4 text-muted-foreground font-medium shadow-[2px_0_8px_-2px_hsl(var(--border))] border-r border-border/30 group-hover:shadow-[2px_0_12px_-2px_hsl(var(--border))] transition-all duration-300" style={{ left: '12rem' }}>
-                          {sme.department}
-                        </td>
-                        <td className="sticky bg-gradient-to-r from-card to-card/90 backdrop-blur-sm p-4 text-muted-foreground font-medium shadow-[2px_0_8px_-2px_hsl(var(--border))] border-r border-border/30 group-hover:shadow-[2px_0_12px_-2px_hsl(var(--border))] transition-all duration-300" style={{ left: '22rem' }}>
-                          <span className="font-mono text-sm">{sme.employee_id}</span>
-                        </td>
+                    {smeList.map((sme) => (
+                      <tr key={sme.id} className="border-b border-border/50 hover:bg-muted/30">
+                        <td className="sticky left-0 bg-card p-3 font-medium text-foreground">{sme.name}</td>
+                        <td className="sticky bg-card p-3 text-muted-foreground" style={{ left: '12rem' }}>{sme.department}</td>
+                        <td className="sticky bg-card p-3 text-muted-foreground" style={{ left: '22rem' }}>{sme.employee_id}</td>
                         {dates.map((date) => {
                           const dateStr = formatDateAsUTC(date);
                           const key = `${sme.id}|${dateStr}`;
@@ -378,32 +339,17 @@ const SMEAttendance = () => {
                           const future = isDateInFuture(date);
                           const dayOfWeek = date.getUTCDay();
                           const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                          const isToday = formatDateAsUTC(date) === formatDateAsUTC(new Date());
 
                           return (
-                            <td key={key} className={`p-4 text-center transition-all duration-300 ${
-                              isWeekend && viewType === 'month' 
-                                ? 'bg-gradient-to-b from-accent/5 to-accent/2' 
-                                : 'hover:bg-muted/10'
-                            } ${isToday ? 'bg-gradient-to-b from-primary/5 to-primary/2' : ''}`}>
+                            <td key={key} className={`p-3 text-center ${isWeekend && viewType === 'month' ? 'bg-muted/20' : ''}`}>
                               <div className="flex flex-col items-center gap-2">
                                 <Switch
                                   checked={isPresent}
                                   onCheckedChange={() => handleAttendanceToggle(sme.id, date)}
                                   disabled={future}
-                                  className={`transition-all duration-300 ${
-                                    isPresent 
-                                      ? 'data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-green-500 data-[state=checked]:to-green-600 shadow-sm' 
-                                      : 'hover:scale-105'
-                                  }`}
+                                  className="data-[state=checked]:bg-success"
                                 />
-                                <span className={`text-xs font-medium transition-all duration-200 ${
-                                  future 
-                                    ? 'text-muted-foreground/60' 
-                                    : isPresent 
-                                      ? 'text-green-600 font-semibold' 
-                                      : 'text-red-500'
-                                }`}>
+                                <span className={`text-xs ${future ? 'text-muted-foreground' : (isPresent ? 'text-success' : 'text-muted-foreground')}`}>
                                   {future ? '-' : (isPresent ? 'Present' : 'Absent')}
                                 </span>
                               </div>

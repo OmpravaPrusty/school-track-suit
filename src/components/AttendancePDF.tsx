@@ -50,8 +50,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   table: {
-    display: "flex",
-    flexDirection: "column",
+    display: "table",
     width: "auto",
     borderStyle: "solid",
     borderWidth: 1,
