@@ -143,7 +143,7 @@ const ReportGeneration = () => {
         overallPercentage,
       });
 
-      toast({ title: "Report Generated", description: "Your PDF is ready for download.", variant: "success" });
+      toast({ title: "Report Generated", description: "Your PDF is ready for download." });
 
     } catch (error: any) {
       toast({ title: "Error Generating Report", description: error.message, variant: "destructive" });
