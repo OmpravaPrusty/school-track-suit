@@ -110,18 +110,18 @@ export function AdminSidebar() {
 
   return (
     <Sidebar
-      className={`${collapsed ? "w-16" : "w-64"} transition-all duration-300 border-r border-sidebar-border bg-sidebar`}
+      className={`${collapsed ? "w-16" : "w-64"} transition-all duration-300 border-r border-sidebar-border bg-gradient-to-b from-sidebar to-sidebar/95`}
     >
       <SidebarContent className="p-0">
-        <div className="p-6 border-b border-sidebar-border">
+        <div className="p-6 border-b border-sidebar-border/50 bg-gradient-to-r from-primary/5 to-primary/10">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <GraduationCap className="h-5 w-5 text-primary-foreground" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
+              <GraduationCap className="h-6 w-6 text-primary-foreground" />
             </div>
             {!collapsed && (
               <div>
-                <h2 className="font-semibold text-sidebar-foreground">Admin Panel</h2>
-                <p className="text-xs text-sidebar-foreground/70">Educational Management</p>
+                <h2 className="font-bold text-sidebar-foreground text-lg">Ashwakalpam</h2>
+                <p className="text-xs text-sidebar-foreground/70 font-medium">Admin Portal</p>
               </div>
             )}
           </div>
@@ -188,21 +188,21 @@ export function AdminSidebar() {
                   </div>
                   {sankalp90Items.map((item) => (
                     <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild className="h-12 rounded-lg">
-                        <NavLink
-                          to={item.url}
-                          className={({ isActive }) =>
-                            `flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${
-                              isActive
-                                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-sm"
-                                : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-                            }`
-                          }
-                        >
-                          <item.icon className="h-5 w-5 flex-shrink-0" />
-                          <span>{item.title}</span>
-                        </NavLink>
-                      </SidebarMenuButton>
+                       <SidebarMenuButton asChild className="h-12 rounded-xl mx-2">
+                         <NavLink
+                           to={item.url}
+                           className={({ isActive }) =>
+                             `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                               isActive
+                                 ? "bg-gradient-to-r from-primary/10 to-primary/5 text-primary border border-primary/20 shadow-sm font-medium"
+                                 : "text-sidebar-foreground hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground"
+                             }`
+                           }
+                         >
+                           <item.icon className="h-5 w-5 flex-shrink-0" />
+                           <span className="font-medium">{item.title}</span>
+                         </NavLink>
+                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
                 </>
