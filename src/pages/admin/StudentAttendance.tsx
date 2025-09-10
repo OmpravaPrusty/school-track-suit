@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,7 +9,20 @@ import { Calendar, Users, Clock, ArrowLeft, ChevronLeft, ChevronRight } from "lu
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { format, startOfWeek, endOfWeek, add } from "date-fns";
+import { format, add, getDaysInMonth, startOfWeek, endOfWeek } from "date-fns";
+
+// Helper to create a date in UTC to avoid timezone issues
+const createUTCDate = (year: number, month: number, day: number): Date => {
+  return new Date(Date.UTC(year, month, day));
+};
+
+// Helper to format a date as 'yyyy-MM-dd' in UTC
+const formatDateAsUTC = (date: Date): string => {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 interface Student {
   id: string;
@@ -27,7 +40,7 @@ interface Batch {
 const StudentAttendance = () => {
   const navigate = useNavigate();
   const [selectedBatch, setSelectedBatch] = useState("");
-  const [viewType, setViewType] = useState("");
+  const [viewType, setViewType] = useState("day");
   const [referenceDate, setReferenceDate] = useState(new Date());
   const [batches, setBatches] = useState<Batch[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -40,39 +53,40 @@ const StudentAttendance = () => {
     { value: "month", label: "Month View" },
   ];
 
+  const dates = useMemo(() => {
+    if (!viewType) return [];
+
+    const year = referenceDate.getFullYear();
+    const month = referenceDate.getMonth();
+    const day = referenceDate.getDate();
+
+    const baseDate = createUTCDate(year, month, day);
+    const newDates = [];
+
+    if (viewType === "day") {
+      newDates.push(baseDate);
+    } else if (viewType === "week") {
+      const dayOfWeek = baseDate.getUTCDay(); // 0 = Sunday
+      const weekStart = createUTCDate(year, month, day - dayOfWeek);
+      for (let i = 0; i < 7; i++) {
+        const dateInWeek = createUTCDate(weekStart.getUTCFullYear(), weekStart.getUTCMonth(), weekStart.getUTCDate() + i);
+        newDates.push(dateInWeek);
+      }
+    } else if (viewType === "month") {
+      const daysInMonth = getDaysInMonth(baseDate);
+      for (let i = 1; i <= daysInMonth; i++) {
+        newDates.push(createUTCDate(year, month, i));
+      }
+    }
+    return newDates;
+  }, [viewType, referenceDate]);
+
   useEffect(() => {
     fetchBatches();
   }, []);
 
-  useEffect(() => {
-    if (selectedBatch && viewType) {
-      fetchStudentsAndAttendance();
-    }
-  }, [selectedBatch, viewType, referenceDate]);
-
-  const fetchBatches = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('batches')
-        .select('id, name')
-        .order('name');
-
-      if (error) throw error;
-      setBatches(data || []);
-    } catch (error) {
-      console.error('Error fetching batches:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch batches",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const fetchStudentsAndAttendance = async () => {
-    if (!selectedBatch || !viewType) return;
+    if (!selectedBatch || !viewType || dates.length === 0) return;
     setLoading(true);
     try {
       const { data: studentsData, error: studentsError } = await supabase
@@ -83,16 +97,15 @@ const StudentAttendance = () => {
       if (studentsError) throw studentsError;
       setStudents(studentsData || []);
 
-      const studentIds = studentsData.map(s => s.id);
-      const dateRange = generateDates();
-      if (dateRange.length === 0 || studentIds.length === 0) {
+      const studentIds = (studentsData || []).map(s => s.id);
+      if (studentIds.length === 0) {
         setAttendance({});
         setLoading(false);
         return;
       }
 
-      const startDate = formatDate(dateRange[0]);
-      const endDate = formatDate(dateRange[dateRange.length - 1]);
+      const startDate = formatDateAsUTC(dates[0]);
+      const endDate = formatDateAsUTC(dates[dates.length - 1]);
 
       const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance')
@@ -122,37 +135,31 @@ const StudentAttendance = () => {
     }
   };
 
-  const generateDates = () => {
-    if (!viewType) return [];
-    const baseDate = new Date(referenceDate);
-    const dates = [];
-    if (viewType === "day") {
-      dates.push(baseDate);
-    } else if (viewType === "week") {
-      const currentDay = baseDate.getDay();
-      const firstDayOfWeek = new Date(baseDate);
-      firstDayOfWeek.setDate(baseDate.getDate() - currentDay);
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(firstDayOfWeek);
-        date.setDate(firstDayOfWeek.getDate() + i);
-        dates.push(date);
-      }
-    } else if (viewType === "month") {
-      const year = baseDate.getFullYear();
-      const month = baseDate.getMonth();
-      const firstDay = new Date(year, month, 1);
-      const lastDay = new Date(year, month + 1, 0);
-      for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
-        dates.push(new Date(d));
-      }
+  useEffect(() => {
+    if (selectedBatch && viewType) {
+      fetchStudentsAndAttendance();
     }
-    return dates;
+  }, [selectedBatch, viewType, dates]);
+
+  const fetchBatches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('batches')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      setBatches(data || []);
+    } catch (error) {
+      console.error('Error fetching batches:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const dates = generateDates();
-
-  const handleAttendanceToggle = (studentId: string, date: string) => {
-    const key = `${studentId}|${date}`;
+  const handleAttendanceToggle = (studentId: string, date: Date) => {
+    const dateStr = formatDateAsUTC(date);
+    const key = `${studentId}|${dateStr}`;
     setAttendance(prev => {
       const currentStatus = prev[key];
       const newStatus = currentStatus === 'present' ? 'absent' : 'present';
@@ -168,24 +175,16 @@ const StudentAttendance = () => {
         return;
       }
 
-      const promises = attendanceChanges.map(async ([key, status]) => {
+      const upsertData = attendanceChanges.map(([key, status]) => {
         const [student_id, attendance_date] = key.split('|');
-
-        const { data: existing } = await supabase
-          .from('attendance')
-          .select('id')
-          .eq('student_id', student_id)
-          .eq('attendance_date', attendance_date)
-          .maybeSingle();
-
-        if (existing) {
-          await supabase.from('attendance').update({ status }).eq('id', existing.id).throwOnError();
-        } else {
-          await supabase.from('attendance').insert({ student_id, attendance_date, status, sme_id: null }).throwOnError();
-        }
+        return { student_id, attendance_date, status, sme_id: null };
       });
 
-      await Promise.all(promises);
+      const { error } = await supabase.from('attendance').upsert(upsertData, {
+        onConflict: 'student_id, attendance_date',
+      });
+
+      if (error) throw error;
 
       toast({
         title: "Success",
@@ -200,13 +199,6 @@ const StudentAttendance = () => {
         variant: "destructive",
       });
     }
-  };
-
-  const formatDate = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
   };
 
   const formatDateRange = (date: Date, viewType: string) => {
@@ -226,9 +218,8 @@ const StudentAttendance = () => {
 
   const isDateInFuture = (date: Date) => {
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    date.setHours(0, 0, 0, 0);
-    return date > today;
+    const todayUTC = createUTCDate(today.getFullYear(), today.getMonth(), today.getDate());
+    return date.getTime() > todayUTC.getTime();
   };
 
   const handleDateNavigation = (direction: 'prev' | 'next') => {
@@ -291,7 +282,7 @@ const StudentAttendance = () => {
             
               <div className="md:col-span-1">
                 <Label className="text-sm font-medium mb-2 block">View Type</Label>
-                <Select value={viewType} onValueChange={setViewType}>
+                <Select value={viewType} onValueChange={(value) => setViewType(value || "day")}>
                   <SelectTrigger>
                     <SelectValue placeholder="Choose view type" />
                   </SelectTrigger>
@@ -331,23 +322,34 @@ const StudentAttendance = () => {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto rounded-md border">
-              <table className="w-full border-collapse">
+              <table className="border-collapse w-max">
                 <thead>
                   <tr className="border-b border-border">
                     <th className="sticky left-0 bg-card p-3 text-left font-medium text-foreground z-10 w-48">Student</th>
                     <th className="sticky bg-card p-3 text-left font-medium text-foreground z-10 w-32" style={{ left: '12rem' }}>Student ID</th>
-                    {dates.map((date) => (
-                      <th key={date.toISOString()} className="text-center p-3 font-medium text-foreground min-w-[100px]">
-                        <div className="flex flex-col items-center gap-1">
-                          <span className="text-xs">{formatDate(date)}</span>
-                          {isDateInFuture(date) && (
-                            <Badge variant="secondary" className="text-xs px-1 py-0">
-                              Future
-                            </Badge>
-                          )}
-                        </div>
-                      </th>
-                    ))}
+                    {dates.map((date) => {
+                      const dayOfWeek = date.getUTCDay();
+                      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                      return (
+                        <th key={date.toISOString()} className={`text-center p-3 font-medium text-foreground min-w-[80px] ${isWeekend && viewType === 'month' ? 'bg-muted/20' : ''}`}>
+                          <div className="flex flex-col items-center gap-1">
+                            {viewType === 'month' ? (
+                              <>
+                                <span className="text-xs font-semibold">{format(date, 'E')}</span>
+                                <span className="text-lg font-bold">{date.getUTCDate()}</span>
+                              </>
+                            ) : (
+                              <span className="text-xs">{formatDateAsUTC(date)}</span>
+                            )}
+                            {isDateInFuture(date) && (
+                              <Badge variant="secondary" className="text-xs px-1 py-0">
+                                Future
+                              </Badge>
+                            )}
+                          </div>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
@@ -356,23 +358,25 @@ const StudentAttendance = () => {
                        <td className="sticky left-0 bg-card p-3 font-medium text-foreground">{student.full_name}</td>
                        <td className="sticky bg-card p-3 text-muted-foreground" style={{ left: '12rem' }}>{student.students?.student_id || '-'}</td>
                       {dates.map((date) => {
-                        const dateStr = formatDate(date);
+                        const dateStr = formatDateAsUTC(date);
                         const key = `${student.id}|${dateStr}`;
                         const status = attendance[key] || 'absent';
                         const isPresent = status === 'present';
-                        const isFuture = isDateInFuture(date);
+                        const future = isDateInFuture(date);
+                        const dayOfWeek = date.getUTCDay();
+                        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
                         
                          return (
-                           <td key={dateStr} className="p-3 text-center">
+                           <td key={dateStr} className={`p-3 text-center ${isWeekend && viewType === 'month' ? 'bg-muted/20' : ''}`}>
                              <div className="flex flex-col items-center gap-2">
                                <Switch
                                  checked={isPresent}
-                                 onCheckedChange={() => handleAttendanceToggle(student.id, dateStr)}
-                                 disabled={isFuture}
+                                 onCheckedChange={() => handleAttendanceToggle(student.id, date)}
+                                 disabled={future}
                                  className="data-[state=checked]:bg-success"
                                />
-                               <span className={`text-xs ${isPresent ? 'text-success' : 'text-muted-foreground'}`}>
-                                 {isFuture ? '-' : (isPresent ? 'Present' : 'Absent')}
+                               <span className={`text-xs ${future ? 'text-muted-foreground' : (isPresent ? 'text-success' : 'text-muted-foreground')}`}>
+                                 {future ? '-' : (isPresent ? 'Present' : 'Absent')}
                                </span>
                              </div>
                            </td>
