@@ -44,7 +44,32 @@ const StudentAttendance = () => {
     fetchBatches();
   }, []);
 
-  
+  useEffect(() => {
+    if (selectedBatch && viewType) {
+      fetchStudentsAndAttendance();
+    }
+  }, [selectedBatch, viewType, referenceDate]);
+
+  const fetchBatches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('batches')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      setBatches(data || []);
+    } catch (error) {
+      console.error('Error fetching batches:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch batches",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchStudentsAndAttendance = async () => {
     if (!selectedBatch || !viewType) return;
