@@ -1,212 +1,179 @@
-import { CalendarCheck, Users, GraduationCap, Layers, BookOpen, School, Building, VideoIcon, FileText ,FolderOpen, ChevronDown, ChevronRight} from "lucide-react";
+import {
+  CalendarCheck,
+  Users,
+  GraduationCap,
+  Layers,
+  BookOpen,
+  School,
+  VideoIcon,
+  FileText,
+} from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuButton,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { useState } from "react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useEffect, useState } from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-const navigationItems = [
+const navigationConfig = [
   {
-    title: "Programs",
-    url: "/admin/programs",
-    icon: FolderOpen,
-    subItems: [
-      {
-        title: "Sankalp 90",
-        url: "/admin/attendance",
-        description: "90-day skill development program"
-      },
-      {
-        title: "Teacher CPD",
-        url: "/admin/programs/teacher-cpd",
-        description: "Continuous Professional Development"
-      },
-      {
-        title: "Computing and AI",
-        url: "/admin/programs/caci",
-        description: "Computing and AI Program"
-      }
-    ]
-  }
-];
-
-const sankalp90Items = [
-  {
-    title: "Attendance",
-    url: "/admin/attendance",
-    icon: CalendarCheck,
-  },
-  {
-    title: "Batches",
-    url: "/admin/batches",
+    program: "Sankalp 90",
     icon: Layers,
+    basePath: "/admin",
+    subItems: [
+      { title: "Attendance", url: "/admin/attendance", icon: CalendarCheck },
+      { title: "Batches", url: "/admin/batches", icon: Layers },
+      { title: "Teachers", url: "/admin/teachers", icon: BookOpen },
+      { title: "SME", url: "/admin/sme", icon: GraduationCap },
+      { title: "Students", url: "/admin/students", icon: Users },
+      { title: "Schools", url: "/admin/schools", icon: School },
+      { title: "Sessions", url: "/admin/sessions", icon: VideoIcon },
+      { title: "Reports", url: "/admin/reports", icon: FileText },
+    ],
   },
   {
-    title: "Teachers",
-    url: "/admin/teachers",
+    program: "Teacher CPD",
     icon: BookOpen,
+    basePath: "/admin/programs/teacher-cpd",
+    subItems: [],
   },
   {
-    title: "SME",
-    url: "/admin/sme",
+    program: "Computing & AI",
     icon: GraduationCap,
+    basePath: "/admin/programs/caci",
+    subItems: [],
   },
-  {
-    title: "Students",
-    url: "/admin/students",
-    icon: Users,
-  },
-  {
-    title: "Schools",
-    url: "/admin/schools",
-    icon: School,
-  },
-  // {
-  //   title: "Organizations",
-  //   url: "/admin/organizations",
-  //   icon: Building,
-  // },
-  {
-    title: "Sessions",
-    url: "/admin/sessions",
-    icon: VideoIcon,
-  },
-  {
-    title: "Reports",
-    url: "/admin/reports",
-    icon: FileText,
-  },
-  // {
-  //   title: "User Management",
-  //   url: "/admin/user-management",
-  //   icon: Users,
-  // },
 ];
+
+const NavItem = ({ collapsed, item }: { collapsed: boolean, item: any }) => {
+  const { isActive } = useIsActive(item.basePath || item.url);
+
+  const linkContent = (
+    <>
+      <item.icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-primary' : ''}`} />
+      {!collapsed && <span className="flex-1 text-left">{item.program || item.title}</span>}
+    </>
+  );
+
+  return (
+    <TooltipProvider delayDuration={0}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <SidebarMenuButton asChild className="h-12 rounded-lg">
+            <NavLink
+              to={item.basePath || item.url}
+              className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${
+                isActive
+                  ? "bg-primary/10 text-primary font-bold"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              {linkContent}
+            </NavLink>
+          </SidebarMenuButton>
+        </TooltipTrigger>
+        {collapsed && (
+          <TooltipContent side="right" className="bg-foreground text-background">
+            {item.program || item.title}
+          </TooltipContent>
+        )}
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
+
+const useIsActive = (path: string) => {
+  const location = useLocation();
+  const isActive = location.pathname === path;
+  return { isActive };
+};
 
 export function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-    const location = useLocation();
-  const [programsOpen, setProgramsOpen] = useState(true);
+  const location = useLocation();
+  const [openAccordion, setOpenAccordion] = useState<string[]>([]);
 
-  // Check if we're in a Sankalp90 route to show those navigation items
-  const isSankalp90Route = location.pathname.includes('/admin/attendance') || 
-                           location.pathname.includes('/admin/batches') ||
-                           location.pathname.includes('/admin/teachers') ||
-                           location.pathname.includes('/admin/sme') ||
-                           location.pathname.includes('/admin/students') ||
-                           location.pathname.includes('/admin/schools') ||
-                           location.pathname.includes('/admin/sessions') ||
-                           location.pathname.includes('/admin/reports');
+  useEffect(() => {
+    if (collapsed) {
+      setOpenAccordion([]);
+      return;
+    }
+    // Sort by path length descending to find the most specific match first.
+    // This prevents a generic path like "/admin" from matching before a more specific
+    // path like "/admin/programs/caci".
+    const sortedConfig = [...navigationConfig].sort((a, b) => b.basePath.length - a.basePath.length);
+    const activeProgram = sortedConfig.find(item => location.pathname.startsWith(item.basePath));
+
+    if (activeProgram) {
+      setOpenAccordion([activeProgram.program]);
+    }
+  }, [location.pathname, collapsed]);
 
   return (
     <Sidebar
-      className={`${collapsed ? "w-16" : "w-64"} transition-all duration-300 border-r border-sidebar-border bg-sidebar`}
+      className={`border-r border-border bg-card text-foreground`}
     >
       <SidebarContent className="p-0">
-        <div className="p-6 border-b border-sidebar-border">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <GraduationCap className="h-5 w-5 text-primary-foreground" />
-            </div>
-            {!collapsed && (
-              <div>
-                <h2 className="font-semibold text-sidebar-foreground">Admin Panel</h2>
-                <p className="text-xs text-sidebar-foreground/70">Educational Management</p>
-              </div>
-            )}
+        <div className="p-4 border-b border-border flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
+            <GraduationCap className="h-6 w-6 text-primary-foreground" />
           </div>
+          {!collapsed && (
+            <div>
+              <h2 className="font-bold text-lg">Admin Panel</h2>
+              <p className="text-xs text-muted-foreground">Educational Management</p>
+            </div>
+          )}
         </div>
 
-        <SidebarGroup>
-          <SidebarGroupLabel className="px-6 text-sidebar-foreground/70 font-medium">
-            {!collapsed && "Navigation"}
-          </SidebarGroupLabel>
+        <SidebarGroup className="py-4">
           <SidebarGroupContent className="px-3">
             <SidebarMenu>
-              {navigationItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                   <Collapsible open={programsOpen && !collapsed} onOpenChange={setProgramsOpen}>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton className="h-12 rounded-lg">
-                        <div className="flex items-center gap-3 px-3 py-3 rounded-lg transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground w-full">
-                          <item.icon className="h-5 w-5 flex-shrink-0" />
-                          {!collapsed && (
-                            <>
-                              <span className="flex-1">{item.title}</span>
-                              {programsOpen ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    {!collapsed && (
-                      <CollapsibleContent className="ml-6 mt-2 space-y-1">
-                        {item.subItems?.map((subItem) => (
-                          <SidebarMenuButton key={subItem.title} asChild className="h-10 rounded-lg">
-                            <NavLink
-                              to={subItem.url}
-                              className={({ isActive }) =>
-                                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                                  isActive
-                                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-                                }`
-                              }
-                            >
-                              <span>{subItem.title}</span>
-                            </NavLink>
-                          </SidebarMenuButton>
-                        ))}
-                      </CollapsibleContent>
+              <Accordion
+                type="multiple"
+                value={openAccordion}
+                onValueChange={setOpenAccordion}
+                className="space-y-1"
+              >
+                {navigationConfig.map((item) => (
+                  <SidebarMenuItem key={item.program} className="px-0">
+                    {item.subItems && item.subItems.length > 0 ? (
+                      <AccordionItem value={item.program} className="border-none">
+                        <TooltipProvider delayDuration={0}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <AccordionTrigger
+                                    className="flex items-center gap-3 px-3 py-3 rounded-lg transition-colors hover:bg-muted"
+                                    >
+                                    <item.icon className="h-5 w-5 flex-shrink-0 text-primary" />
+                                    {!collapsed && <span className="flex-1 text-left font-semibold">{item.program}</span>}
+                                    </AccordionTrigger>
+                                </TooltipTrigger>
+                                {collapsed && <TooltipContent side="right">{item.program}</TooltipContent>}
+                            </Tooltip>
+                        </TooltipProvider>
+
+                        <AccordionContent className="ml-4 mt-2 space-y-1 border-l border-border pl-4">
+                          {item.subItems.map((subItem) => (
+                            <NavItem key={subItem.title} collapsed={collapsed} item={subItem} />
+                          ))}
+                        </AccordionContent>
+                      </AccordionItem>
+                    ) : (
+                      <NavItem collapsed={collapsed} item={{...item, url: item.basePath}} />
                     )}
-                  </Collapsible>
-                </SidebarMenuItem>
-              ))}
-              
-              {/* Show Sankalp90 specific navigation when in those routes */}
-              {isSankalp90Route && !collapsed && (
-                <>
-                  <div className="my-4 px-3">
-                    <div className="h-px bg-sidebar-border"></div>
-                  </div>
-                  <div className="px-3 mb-2">
-                    <span className="text-xs font-medium text-sidebar-foreground/70">Sankalp 90 Management</span>
-                  </div>
-                  {sankalp90Items.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild className="h-12 rounded-lg">
-                        <NavLink
-                          to={item.url}
-                          className={({ isActive }) =>
-                            `flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${
-                              isActive
-                                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-sm"
-                                : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-                            }`
-                          }
-                        >
-                          <item.icon className="h-5 w-5 flex-shrink-0" />
-                          <span>{item.title}</span>
-                        </NavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </>
-              )}
+                  </SidebarMenuItem>
+                ))}
+              </Accordion>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

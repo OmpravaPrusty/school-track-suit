@@ -39,8 +39,8 @@ interface ReportData {
   }[];
   batchName: string;
   month: string;
-  totalPresent: number;
-  totalAbsent: number;
+  totalStudents: number;
+  workingSessions: number;
   overallPercentage: number;
 }
 
@@ -104,20 +104,19 @@ const ReportGeneration = () => {
       const attendanceRecords = attendanceData as AttendanceRecord[];
 
       // 3. Process the data
-      const totalDaysInMonth = getDaysInMonth(new Date(selectedYear, selectedMonth));
-      let totalPresent = 0;
-      let totalAbsent = 0;
+      const totalStudents = students.length;
+      const workingSessions = new Set(attendanceRecords.map(rec => rec.attendance_date)).size;
+
+      let totalPresentsAcrossAllStudents = 0;
 
       const processedStudents = students.map(student => {
         const studentAttendance = attendanceRecords.filter(rec => rec.student_id === student.id);
         const present = studentAttendance.filter(rec => rec.status === 'present').length;
         const absent = studentAttendance.filter(rec => rec.status === 'absent').length;
-        // Assuming non-recorded days are absent for percentage calculation
-        const totalRecordedOrAssumed = present + absent; // Or use totalDaysInMonth
-        const percentage = totalRecordedOrAssumed > 0 ? Math.round((present / totalRecordedOrAssumed) * 100) : 0;
 
-        totalPresent += present;
-        totalAbsent += absent;
+        totalPresentsAcrossAllStudents += present;
+
+        const percentage = workingSessions > 0 ? Math.round((present / workingSessions) * 100) : 0;
 
         return {
           id: student.students.student_id || 'N/A',
@@ -128,8 +127,8 @@ const ReportGeneration = () => {
         };
       });
 
-      const overallTotal = totalPresent + totalAbsent;
-      const overallPercentage = overallTotal > 0 ? Math.round((totalPresent / overallTotal) * 100) : 0;
+      const totalPossibleAttendance = totalStudents * workingSessions;
+      const overallPercentage = totalPossibleAttendance > 0 ? Math.round((totalPresentsAcrossAllStudents / totalPossibleAttendance) * 100) : 0;
 
       const monthName = new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long', year: 'numeric' });
       const batchName = batches.find(b => b.id === selectedBatch)?.name || 'Unknown Batch';
@@ -138,8 +137,8 @@ const ReportGeneration = () => {
         students: processedStudents,
         batchName,
         month: monthName,
-        totalPresent,
-        totalAbsent,
+        totalStudents,
+        workingSessions,
         overallPercentage,
       });
 

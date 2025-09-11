@@ -4,18 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDaysInMonth } from "date-fns";
-
-// Helper to create a date in UTC to avoid timezone issues
-const createUTCDate = (year: number, month: number, day: number): Date => {
-  return new Date(Date.UTC(year, month, day));
-};
-
-// Helper to parse a 'yyyy-MM-dd' string into a UTC Date object
-const parseUTCDate = (dateStr: string): Date => {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  return createUTCDate(year, month - 1, day);
-};
+import { format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
 
 interface MyAttendanceProps {
   userId: string;
@@ -28,7 +17,7 @@ interface AttendanceRecord {
 }
 
 const MyAttendance = ({ userId, userRole }: MyAttendanceProps) => {
-  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  const [date, setDate] = useState<Date>(new Date());
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,8 +27,8 @@ const MyAttendance = ({ userId, userRole }: MyAttendanceProps) => {
       setIsLoading(true);
       setError(null);
 
-      const from = startOfMonth(currentMonth);
-      const to = endOfMonth(currentMonth);
+      const from = startOfMonth(date);
+      const to = endOfMonth(date);
 
       const query = supabase
         .from('attendance')
@@ -62,15 +51,20 @@ const MyAttendance = ({ userId, userRole }: MyAttendanceProps) => {
     if (userId) {
       fetchAttendance();
     }
-  }, [userId, userRole, currentMonth]);
+  }, [userId, userRole, date]);
 
-  const presentDays = attendance.filter(d => d.status === 'present').map(d => parseUTCDate(d.attendance_date));
-  const absentDays = attendance.filter(d => d.status === 'absent').map(d => parseUTCDate(d.attendance_date));
+  const presentDays = attendance.filter(d => d.status === 'present').map(d => new Date(d.attendance_date + 'T00:00:00'));
+  const absentDays = attendance.filter(d => d.status === 'absent').map(d => new Date(d.attendance_date + 'T00:00:00'));
 
-  const totalDaysInMonth = getDaysInMonth(currentMonth);
+  const monthDays = eachDayOfInterval({
+    start: startOfMonth(date),
+    end: endOfMonth(date)
+  });
+
+  const totalDays = monthDays.length;
   const presentCount = presentDays.length;
   const absentCount = absentDays.length;
-  const attendancePercentage = (presentCount + absentCount) > 0 ? Math.round((presentCount / (presentCount + absentCount)) * 100) : 0;
+  const attendancePercentage = totalDays > 0 ? Math.round((presentCount / (presentCount + absentCount)) * 100) : 0;
 
   return (
     <Card>
@@ -78,7 +72,7 @@ const MyAttendance = ({ userId, userRole }: MyAttendanceProps) => {
         <CardTitle>My Attendance</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading && attendance.length === 0 ? (
+        {isLoading ? (
           <div className="flex justify-center items-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
@@ -89,16 +83,23 @@ const MyAttendance = ({ userId, userRole }: MyAttendanceProps) => {
             <div>
               <Calendar
                 mode="single"
-                month={currentMonth}
-                onMonthChange={setCurrentMonth}
+                selected={date}
+                onSelect={(d) => d && setDate(d)}
+                onMonthChange={setDate}
                 className="rounded-md border"
                 modifiers={{
                   present: presentDays,
                   absent: absentDays,
                 }}
-                modifiersClassNames={{
-                  present: 'bg-success text-success-foreground',
-                  absent: 'bg-destructive text-destructive-foreground',
+                modifiersStyles={{
+                  present: {
+                    color: 'hsl(var(--success-foreground))',
+                    backgroundColor: 'hsl(var(--success))',
+                  },
+                  absent: {
+                    color: 'hsl(var(--destructive-foreground))',
+                    backgroundColor: 'hsl(var(--destructive))',
+                  },
                 }}
               />
                <div className="flex justify-center gap-4 mt-4">
@@ -114,7 +115,7 @@ const MyAttendance = ({ userId, userRole }: MyAttendanceProps) => {
             </div>
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">
-                Summary for {format(currentMonth, "MMMM yyyy")}
+                Summary for {format(date, "MMMM yyyy")}
               </h3>
               <div className="p-4 bg-muted rounded-lg">
                 <div className="flex justify-between items-center">
@@ -124,18 +125,18 @@ const MyAttendance = ({ userId, userRole }: MyAttendanceProps) => {
                     attendancePercentage >= 50 ? "bg-warning hover:bg-warning" :
                     "bg-destructive hover:bg-destructive"
                   }>
-                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : `${attendancePercentage}%`}
+                    {attendancePercentage}%
                   </Badge>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <Card className="p-4">
                   <p className="text-sm text-muted-foreground">Present Days</p>
-                  <p className="text-2xl font-bold">{isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : presentCount}</p>
+                  <p className="text-2xl font-bold">{presentCount}</p>
                 </Card>
                 <Card className="p-4">
                   <p className="text-sm text-muted-foreground">Absent Days</p>
-                  <p className="text-2xl font-bold">{isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : absentCount}</p>
+                  <p className="text-2xl font-bold">{absentCount}</p>
                 </Card>
               </div>
             </div>
