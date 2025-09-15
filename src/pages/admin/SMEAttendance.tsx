@@ -10,6 +10,16 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, add, sub } from "date-fns";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SME {
   id: string;
@@ -28,6 +38,8 @@ const SMEAttendance = () => {
   const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent'>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const viewTypes = [
     { value: "day", label: "Day View" },
@@ -74,15 +86,10 @@ const SMEAttendance = () => {
     if (viewType === "day") {
       newDates.push(baseDate);
     } else if (viewType === "week") {
-      const currentDay = baseDate.getDay();
-      const firstDayOfWeek = new Date(baseDate);
-      firstDayOfWeek.setDate(baseDate.getDate() - currentDay);
-
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(firstDayOfWeek);
-        date.setDate(firstDayOfWeek.getDate() + i);
-        newDates.push(date);
-      }
+        const firstDayOfWeek = startOfWeek(baseDate, { weekStartsOn: 1 });
+        for (let i = 0; i < 7; i++) {
+            newDates.push(add(firstDayOfWeek, { days: i }));
+        }
     } else if (viewType === "month") {
       const year = baseDate.getFullYear();
       const month = baseDate.getMonth();
@@ -163,6 +170,7 @@ const SMEAttendance = () => {
       }
     });
     setAttendance(newAttendance);
+    setIsDirty(false);
   }, [toast]);
 
 
@@ -183,11 +191,11 @@ const SMEAttendance = () => {
       const newStatus = currentStatus === 'present' ? 'absent' : 'present';
       return { ...prev, [key]: newStatus };
     });
+    setIsDirty(true);
   };
 
   const handleSaveAttendance = async () => {
     setIsSaving(true);
-
     const attendanceChanges = Object.entries(attendance);
 
     if (attendanceChanges.length === 0) {
@@ -196,47 +204,36 @@ const SMEAttendance = () => {
       return;
     }
 
-    const promises = attendanceChanges.map(async ([key, status]) => {
-      const [sme_id, attendance_date] = key.split('|');
+    const modifiedDates = [...new Set(attendanceChanges.map(([key]) => key.split('|')[1]))];
+    const allSMEs = smeList;
+    const upsertPromises = [];
 
-      const { data: existing, error: selectError } = await supabase
-        .from('attendance')
-        .select('id')
-        .eq('sme_id', sme_id)
-        .eq('attendance_date', attendance_date)
-        .maybeSingle();
-
-      if (selectError) {
-        throw new Error(`Failed to check existing attendance for ${sme_id} on ${attendance_date}: ${selectError.message}`);
+    for (const date of modifiedDates) {
+      for (const sme of allSMEs) {
+        const key = `${sme.id}|${date}`;
+        const status = attendance[key] || 'absent';
+        upsertPromises.push(
+          supabase.from('attendance').upsert(
+            { sme_id: sme.id, attendance_date: date, status: status, student_id: null },
+            { onConflict: 'sme_id, attendance_date' }
+          )
+        );
       }
-
-      if (existing) {
-        // Update existing record
-        const { error: updateError } = await supabase
-          .from('attendance')
-          .update({ status })
-          .eq('id', existing.id);
-        if (updateError) {
-          throw new Error(`Failed to update attendance for ${sme_id} on ${attendance_date}: ${updateError.message}`);
-        }
-      } else {
-        // Insert new record
-        const { error: insertError } = await supabase
-          .from('attendance')
-          .insert({ sme_id, attendance_date, status, student_id: null });
-        if (insertError) {
-          throw new Error(`Failed to insert attendance for ${sme_id} on ${attendance_date}: ${insertError.message}`);
-        }
-      }
-    });
+    }
 
     try {
-      await Promise.all(promises);
+      const results = await Promise.all(upsertPromises);
+      results.forEach(result => {
+        if (result.error) throw result.error;
+      });
       toast({
         title: "Success",
         description: "Attendance records have been saved successfully.",
         variant: "success",
       });
+      setIsDirty(false);
+      // After saving, refetch the attendance to get the fresh state
+      fetchAttendance(allSMEs.map(s => s.id), dates);
     } catch (error: any) {
       console.error("Error saving attendance:", error);
       toast({
@@ -264,12 +261,50 @@ const SMEAttendance = () => {
     return comparisonDate > today;
   };
 
+  const handleBackNavigation = () => {
+    if (isDirty) {
+      setShowConfirmDialog(true);
+    } else {
+      navigate("/admin/attendance");
+    }
+  };
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isDirty]);
+
   return (
     <div className="space-y-6">
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>You have unsaved changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to leave? Your changes will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay</AlertDialogCancel>
+            <AlertDialogAction onClick={() => navigate("/admin/attendance")}>Leave</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="flex items-center gap-4">
         <Button 
           variant="outline" 
-          onClick={() => navigate("/admin/attendance")}
+          onClick={handleBackNavigation}
           className="flex items-center gap-2"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -343,15 +378,15 @@ const SMEAttendance = () => {
             ) : smeList.length === 0 ? (
               <p className="text-center text-muted-foreground py-10">No SMEs found. Please add SMEs first.</p>
             ) : (
-              <div className="w-full overflow-x-auto rounded-md border">
+              <div className="w-full overflow-x-auto rounded-md border max-h-[600px] overflow-y-auto">
                 <table className="min-w-full border-collapse">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="sticky left-0 bg-card p-3 text-left font-medium text-foreground z-20 w-48">SME Name</th>
-                      <th className="p-3 text-left font-medium text-foreground">Department</th>
-                      <th className="p-3 text-left font-medium text-foreground">Employee ID</th>
+                      <th className="sticky top-0 left-0 bg-card p-3 text-left font-medium text-foreground z-30 w-48">SME Name</th>
+                      <th className="sticky top-0 bg-card p-3 text-left font-medium text-foreground z-10">Department</th>
+                      <th className="sticky top-0 bg-card p-3 text-left font-medium text-foreground z-10">Employee ID</th>
                       {dates.map((date) => (
-                        <th key={date.toISOString()} className="text-center p-3 font-medium text-foreground min-w-[100px]">
+                        <th key={date.toISOString()} className="sticky top-0 bg-card text-center p-3 font-medium text-foreground min-w-[100px] z-10">
                           <div className="flex flex-col items-center gap-1">
                             <span className="text-xs font-semibold">{date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
                             <span className="text-sm">{formatDateForDisplay(date)}</span>
@@ -375,6 +410,7 @@ const SMEAttendance = () => {
                           const status = attendance[key] || 'absent';
                           const isPresent = status === 'present';
                           const isFuture = isDateInFuture(date);
+                          const isSunday = date.getDay() === 0;
 
                           return (
                             <td key={key} className="p-3 text-center">
@@ -382,11 +418,11 @@ const SMEAttendance = () => {
                                 <Switch
                                   checked={isPresent}
                                   onCheckedChange={() => handleAttendanceToggle(sme.id, date)}
-                                  disabled={isFuture}
+                                  disabled={isFuture || isSunday}
                                   className="data-[state=checked]:bg-success"
                                 />
                                 <span className={`text-xs ${isPresent ? 'text-success' : 'text-muted-foreground'}`}>
-                                  {isFuture ? '-' : (isPresent ? 'Present' : 'Absent')}
+                                  {isFuture || isSunday ? '-' : (isPresent ? 'Present' : 'Absent')}
                                 </span>
                               </div>
                             </td>

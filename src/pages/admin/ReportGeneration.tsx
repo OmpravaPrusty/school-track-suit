@@ -3,14 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { FileText, Download, Loader2, Eye, BarChart2, PieChart as PieChartIcon } from "lucide-react";
+import { FileText, Download, Loader2, Eye, BarChart2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import AttendancePDF from '@/components/AttendancePDF';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { startOfMonth, endOfMonth, getDaysInMonth } from 'date-fns';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { startOfMonth, endOfMonth, getDaysInMonth, format } from 'date-fns';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import StudentAttendanceGrid from '@/components/StudentAttendanceGrid';
 
 interface Batch {
   id: string;
@@ -32,11 +33,17 @@ interface AttendanceRecord {
 
 interface ReportData {
   students: {
+    id: string; // This will be the UUID
+    studentId: string; // This will be the human-readable ID
     name: string;
-    id: string; // This is the human-readable student_id
     present: number;
     absent: number;
     percentage: number;
+  }[];
+  attendanceRecords: {
+    student_id: string;
+    status: 'present' | 'absent';
+    attendance_date: string;
   }[];
   batchName: string;
   month: string;
@@ -96,7 +103,7 @@ const ReportGeneration = () => {
 
       const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance')
-        .select('student_id, status')
+        .select('student_id, status, attendance_date')
         .in('student_id', students.map(s => s.id))
         .gte('attendance_date', fromDate.toISOString())
         .lte('attendance_date', toDate.toISOString());
@@ -121,7 +128,8 @@ const ReportGeneration = () => {
         totalAbsent += absent;
 
         return {
-          id: student.students.student_id || 'N/A',
+          id: student.id,
+          studentId: student.students.student_id || 'N/A',
           name: student.full_name,
           present,
           absent,
@@ -137,6 +145,7 @@ const ReportGeneration = () => {
 
       setReportData({
         students: processedStudents,
+        attendanceRecords: attendanceRecords,
         batchName,
         month: monthName,
         totalPresent,
@@ -216,6 +225,14 @@ const ReportGeneration = () => {
             </CardHeader>
             <CardContent className="space-y-8">
               <div>
+                <StudentAttendanceGrid
+                  students={reportData.students}
+                  attendanceRecords={reportData.attendanceRecords}
+                  month={selectedMonth}
+                  year={selectedYear}
+                />
+              </div>
+              <div>
                 <h3 className="text-lg font-semibold mb-2 flex items-center gap-2"><BarChart2 className="h-5 w-5" /> Student-wise Attendance Percentage</h3>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={reportData.students}>
@@ -226,32 +243,6 @@ const ReportGeneration = () => {
                     <Legend />
                     <Bar dataKey="percentage" fill="#8884d8" name="Attendance %" />
                   </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2"><PieChartIcon className="h-5 w-5" /> Overall Batch Attendance</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={[
-                        { name: 'Present', value: reportData.overallPercentage },
-                        { name: 'Absent', value: 100 - reportData.overallPercentage }
-                      ]}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                      nameKey="name"
-                      label={({ name, value }) => `${name} ${value.toFixed(0)}%`}
-                    >
-                      <Cell key="cell-0" fill="#82ca9d" />
-                      <Cell key="cell-1" fill="#ff6b6b" />
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>

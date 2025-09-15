@@ -10,6 +10,16 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format, startOfWeek, endOfWeek, add } from "date-fns";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Student {
   id: string;
@@ -33,6 +43,8 @@ const StudentAttendance = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent'>>({});
+  const [isDirty, setIsDirty] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const viewTypes = [
     { value: "day", label: "Day View" },
@@ -49,6 +61,21 @@ const StudentAttendance = () => {
       fetchStudentsAndAttendance();
     }
   }, [selectedBatch, viewType, referenceDate]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isDirty]);
 
   const fetchBatches = async () => {
     try {
@@ -109,6 +136,7 @@ const StudentAttendance = () => {
         newAttendanceState[key] = record.status as 'present' | 'absent';
       });
       setAttendance(newAttendanceState);
+      setIsDirty(false);
 
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -129,14 +157,10 @@ const StudentAttendance = () => {
     if (viewType === "day") {
       dates.push(baseDate);
     } else if (viewType === "week") {
-      const currentDay = baseDate.getDay();
-      const firstDayOfWeek = new Date(baseDate);
-      firstDayOfWeek.setDate(baseDate.getDate() - currentDay);
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(firstDayOfWeek);
-        date.setDate(firstDayOfWeek.getDate() + i);
-        dates.push(date);
-      }
+        let firstDayOfWeek = startOfWeek(baseDate, { weekStartsOn: 1 });
+        for (let i = 0; i < 7; i++) {
+            dates.push(add(firstDayOfWeek, { days: i }));
+        }
     } else if (viewType === "month") {
       const year = baseDate.getFullYear();
       const month = baseDate.getMonth();
@@ -158,6 +182,7 @@ const StudentAttendance = () => {
       const newStatus = currentStatus === 'present' ? 'absent' : 'present';
       return { ...prev, [key]: newStatus };
     });
+    setIsDirty(true);
   };
 
   const saveAttendance = async () => {
@@ -168,29 +193,36 @@ const StudentAttendance = () => {
         return;
       }
 
-      const promises = attendanceChanges.map(async ([key, status]) => {
-        const [student_id, attendance_date] = key.split('|');
+      const modifiedDates = [...new Set(attendanceChanges.map(([key]) => key.split('|')[1]))];
+      const allStudents = students;
 
-        const { data: existing } = await supabase
-          .from('attendance')
-          .select('id')
-          .eq('student_id', student_id)
-          .eq('attendance_date', attendance_date)
-          .maybeSingle();
+      const upsertPromises = [];
 
-        if (existing) {
-          await supabase.from('attendance').update({ status }).eq('id', existing.id).throwOnError();
-        } else {
-          await supabase.from('attendance').insert({ student_id, attendance_date, status, sme_id: null }).throwOnError();
+      for (const date of modifiedDates) {
+        for (const student of allStudents) {
+          const key = `${student.id}|${date}`;
+          const status = attendance[key] || 'absent';
+
+          upsertPromises.push(
+            supabase.from('attendance').upsert(
+              { student_id: student.id, attendance_date: date, status: status, sme_id: null },
+              { onConflict: 'student_id, attendance_date' }
+            )
+          );
         }
-      });
+      }
 
-      await Promise.all(promises);
+      const results = await Promise.all(upsertPromises);
+
+      results.forEach(result => {
+        if (result.error) throw result.error;
+      });
 
       toast({
         title: "Success",
         description: "Attendance saved successfully",
       });
+      setIsDirty(false);
       fetchStudentsAndAttendance();
     } catch (error: any) {
       console.error('Error saving attendance:', error);
@@ -242,12 +274,35 @@ const StudentAttendance = () => {
     }
   };
 
+  const handleBackNavigation = () => {
+    if (isDirty) {
+      setShowConfirmDialog(true);
+    } else {
+      navigate("/admin/attendance");
+    }
+  };
+
   return (
     <div className="space-y-6">
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>You have unsaved changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to leave? Your changes will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay</AlertDialogCancel>
+            <AlertDialogAction onClick={() => navigate("/admin/attendance")}>Leave</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="flex items-center gap-4">
         <Button 
           variant="outline" 
-          onClick={() => navigate("/admin/attendance")}
+          onClick={handleBackNavigation}
           className="flex items-center gap-2"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -330,13 +385,13 @@ const StudentAttendance = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="w-full overflow-x-auto rounded-md border">
+            <div className="w-full overflow-x-auto rounded-md border max-h-[600px] overflow-y-auto">
               <table className="min-w-full border-collapse">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="sticky left-0 bg-card p-3 text-left font-medium text-foreground z-20 w-60">Student (Name & ID)</th>
+                    <th className="sticky top-0 left-0 bg-card p-3 text-left font-medium text-foreground z-30 w-60">Student (Name & ID)</th>
                     {dates.map((date) => (
-                      <th key={date.toISOString()} className="text-center p-3 font-medium text-foreground min-w-[100px]">
+                      <th key={date.toISOString()} className="sticky top-0 bg-card text-center p-3 font-medium text-foreground min-w-[100px] z-10">
                         <div className="flex flex-col items-center gap-1">
                           <span className="text-xs">{formatDate(date)}</span>
                           {isDateInFuture(date) && (
@@ -364,6 +419,7 @@ const StudentAttendance = () => {
                         const status = attendance[key] || 'absent';
                         const isPresent = status === 'present';
                         const isFuture = isDateInFuture(date);
+                        const isSunday = date.getDay() === 0;
                         
                          return (
                            <td key={dateStr} className="p-3 text-center">
@@ -371,11 +427,11 @@ const StudentAttendance = () => {
                                <Switch
                                  checked={isPresent}
                                  onCheckedChange={() => handleAttendanceToggle(student.id, dateStr)}
-                                 disabled={isFuture}
+                                 disabled={isFuture || isSunday}
                                  className="data-[state=checked]:bg-success"
                                />
                                <span className={`text-xs ${isPresent ? 'text-success' : 'text-muted-foreground'}`}>
-                                 {isFuture ? '-' : (isPresent ? 'Present' : 'Absent')}
+                                 {isFuture || isSunday ? '-' : (isPresent ? 'Present' : 'Absent')}
                                </span>
                              </div>
                            </td>

@@ -100,8 +100,9 @@ const styles = StyleSheet.create({
 
 interface ReportData {
   students: {
-    name: string;
     id: string;
+    studentId: string;
+    name: string;
     present: number;
     absent: number;
     percentage: number;
@@ -153,7 +154,7 @@ const AttendancePDF = ({ data }: AttendancePDFProps) => (
         {data.students.map((student, index) => (
           <View key={index} style={styles.tableRow}>
             <View style={{...styles.tableCol, width: '35%'}}><Text style={styles.tableCell}>{student.name}</Text></View>
-            <View style={{...styles.tableCol, width: '25%'}}><Text style={styles.tableCell}>{student.id}</Text></View>
+            <View style={{...styles.tableCol, width: '25%'}}><Text style={styles.tableCell}>{student.studentId}</Text></View>
             <View style={styles.tableCol}><Text style={styles.tableCell}>{student.present}</Text></View>
             <View style={styles.tableCol}><Text style={styles.tableCell}>{student.absent}</Text></View>
             <View style={styles.tableCol}><Text style={styles.tableCell}>{student.percentage}%</Text></View>
