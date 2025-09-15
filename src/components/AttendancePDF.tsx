@@ -108,8 +108,8 @@ interface ReportData {
   }[];
   batchName: string;
   month: string;
-  totalStudents: number;
-  workingSessions: number;
+  totalPresent: number;
+  totalAbsent: number;
   overallPercentage: number;
 }
 
@@ -127,12 +127,12 @@ const AttendancePDF = ({ data }: AttendancePDFProps) => (
 
       <View style={styles.summarySection}>
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{data.totalStudents}</Text>
-          <Text style={styles.summaryLabel}>Total No. of Students</Text>
+          <Text style={styles.summaryValue}>{data.totalPresent}</Text>
+          <Text style={styles.summaryLabel}>Total Present</Text>
         </View>
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{data.workingSessions}</Text>
-          <Text style={styles.summaryLabel}>Working Sessions</Text>
+          <Text style={styles.summaryValue}>{data.totalAbsent}</Text>
+          <Text style={styles.summaryLabel}>Total Absent</Text>
         </View>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryValue}>{data.overallPercentage}%</Text>

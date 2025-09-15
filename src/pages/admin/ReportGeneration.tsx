@@ -3,13 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { FileText, Download, Loader2, Eye } from "lucide-react";
+import { FileText, Download, Loader2, Eye, BarChart2, PieChart as PieChartIcon } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import AttendancePDF from '@/components/AttendancePDF';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { startOfMonth, endOfMonth, getDaysInMonth } from 'date-fns';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 interface Batch {
   id: string;
@@ -39,8 +40,8 @@ interface ReportData {
   }[];
   batchName: string;
   month: string;
-  totalStudents: number;
-  workingSessions: number;
+  totalPresent: number;
+  totalAbsent: number;
   overallPercentage: number;
 }
 
@@ -104,19 +105,20 @@ const ReportGeneration = () => {
       const attendanceRecords = attendanceData as AttendanceRecord[];
 
       // 3. Process the data
-      const totalStudents = students.length;
-      const workingSessions = new Set(attendanceRecords.map(rec => rec.attendance_date)).size;
-
-      let totalPresentsAcrossAllStudents = 0;
+      const totalDaysInMonth = getDaysInMonth(new Date(selectedYear, selectedMonth));
+      let totalPresent = 0;
+      let totalAbsent = 0;
 
       const processedStudents = students.map(student => {
         const studentAttendance = attendanceRecords.filter(rec => rec.student_id === student.id);
         const present = studentAttendance.filter(rec => rec.status === 'present').length;
         const absent = studentAttendance.filter(rec => rec.status === 'absent').length;
+        // Assuming non-recorded days are absent for percentage calculation
+        const totalRecordedOrAssumed = present + absent; // Or use totalDaysInMonth
+        const percentage = totalRecordedOrAssumed > 0 ? Math.round((present / totalRecordedOrAssumed) * 100) : 0;
 
-        totalPresentsAcrossAllStudents += present;
-
-        const percentage = workingSessions > 0 ? Math.round((present / workingSessions) * 100) : 0;
+        totalPresent += present;
+        totalAbsent += absent;
 
         return {
           id: student.students.student_id || 'N/A',
@@ -127,8 +129,8 @@ const ReportGeneration = () => {
         };
       });
 
-      const totalPossibleAttendance = totalStudents * workingSessions;
-      const overallPercentage = totalPossibleAttendance > 0 ? Math.round((totalPresentsAcrossAllStudents / totalPossibleAttendance) * 100) : 0;
+      const overallTotal = totalPresent + totalAbsent;
+      const overallPercentage = overallTotal > 0 ? Math.round((totalPresent / overallTotal) * 100) : 0;
 
       const monthName = new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long', year: 'numeric' });
       const batchName = batches.find(b => b.id === selectedBatch)?.name || 'Unknown Batch';
@@ -137,8 +139,8 @@ const ReportGeneration = () => {
         students: processedStudents,
         batchName,
         month: monthName,
-        totalStudents,
-        workingSessions,
+        totalPresent,
+        totalAbsent,
         overallPercentage,
       });
 
@@ -206,45 +208,95 @@ const ReportGeneration = () => {
       </Card>
 
       {reportData && !isGenerating && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Your Report is Ready</CardTitle>
-            <CardDescription>Preview the generated report or download it as a PDF.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col sm:flex-row gap-4">
-            <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="w-full gap-2">
-                  <Eye className="h-4 w-4" />
-                  Preview Report
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl h-[90vh]">
-                <DialogHeader>
-                  <DialogTitle>Report Preview</DialogTitle>
-                </DialogHeader>
-                <div className="h-full">
-                  <PDFViewer width="100%" height="100%" className="rounded-md">
-                    <AttendancePDF data={reportData} />
-                  </PDFViewer>
-                </div>
-              </DialogContent>
-            </Dialog>
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Data Visualization</CardTitle>
+              <CardDescription>Visual representation of the attendance data.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              <div>
+                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2"><BarChart2 className="h-5 w-5" /> Student-wise Attendance Percentage</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={reportData.students}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="percentage" fill="#8884d8" name="Attendance %" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2"><PieChartIcon className="h-5 w-5" /> Overall Batch Attendance</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Present', value: reportData.overallPercentage },
+                        { name: 'Absent', value: 100 - reportData.overallPercentage }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                      nameKey="name"
+                      label={({ name, value }) => `${name} ${value.toFixed(0)}%`}
+                    >
+                      <Cell key="cell-0" fill="#82ca9d" />
+                      <Cell key="cell-1" fill="#ff6b6b" />
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
 
-            <PDFDownloadLink
-              document={<AttendancePDF data={reportData} />}
-              fileName={`${reportData.batchName}_${reportData.month}_Attendance.pdf`}
-              className="w-full"
-            >
-              {({ loading }) => (
-                <Button className="w-full gap-2" disabled={loading}>
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                  {loading ? 'Preparing...' : 'Download PDF'}
-                </Button>
-              )}
-            </PDFDownloadLink>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Your Report is Ready</CardTitle>
+              <CardDescription>Preview the generated report or download it as a PDF.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col sm:flex-row gap-4">
+              <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="w-full gap-2">
+                    <Eye className="h-4 w-4" />
+                    Preview Report
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl h-[90vh]">
+                  <DialogHeader>
+                    <DialogTitle>Report Preview</DialogTitle>
+                  </DialogHeader>
+                  <div className="h-full">
+                    <PDFViewer width="100%" height="100%" className="rounded-md">
+                      <AttendancePDF data={reportData} />
+                    </PDFViewer>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <PDFDownloadLink
+                document={<AttendancePDF data={reportData} />}
+                fileName={`${reportData.batchName}_${reportData.month}_Attendance.pdf`}
+                className="w-full"
+              >
+                {({ loading }) => (
+                  <Button className="w-full gap-2" disabled={loading}>
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    {loading ? 'Preparing...' : 'Download PDF'}
+                  </Button>
+                )}
+              </PDFDownloadLink>
+            </CardContent>
+          </Card>
+        </>
       )}
     </div>
   );
