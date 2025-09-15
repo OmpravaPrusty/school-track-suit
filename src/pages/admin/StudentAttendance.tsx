@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format, startOfWeek, endOfWeek, add } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 
 interface Student {
   id: string;
@@ -124,19 +125,16 @@ const StudentAttendance = () => {
 
   const generateDates = () => {
     if (!viewType) return [];
+    if (!viewType) return [];
     const baseDate = new Date(referenceDate);
     const dates = [];
     if (viewType === "day") {
-      dates.push(baseDate);
+        dates.push(baseDate);
     } else if (viewType === "week") {
-      const currentDay = baseDate.getDay();
-      const firstDayOfWeek = new Date(baseDate);
-      firstDayOfWeek.setDate(baseDate.getDate() - currentDay);
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(firstDayOfWeek);
-        date.setDate(firstDayOfWeek.getDate() + i);
-        dates.push(date);
-      }
+        let firstDayOfWeek = startOfWeek(baseDate, { weekStartsOn: 1 });
+        for (let i = 0; i < 7; i++) {
+            dates.push(add(firstDayOfWeek, { days: i }));
+        }
     } else if (viewType === "month") {
       const year = baseDate.getFullYear();
       const month = baseDate.getMonth();
@@ -203,23 +201,20 @@ const StudentAttendance = () => {
   };
 
   const formatDate = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return formatInTimeZone(date, 'UTC', 'yyyy-MM-dd');
   };
 
   const formatDateRange = (date: Date, viewType: string) => {
     if (viewType === 'day') {
-      return format(date, 'MMMM d, yyyy');
+      return formatInTimeZone(date, 'UTC', 'MMMM d, yyyy');
     }
     if (viewType === 'week') {
       const start = startOfWeek(date);
       const end = endOfWeek(date);
-      return `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`;
+      return `${formatInTimeZone(start, 'UTC', 'MMM d')} - ${formatInTimeZone(end, 'UTC', 'MMM d, yyyy')}`;
     }
     if (viewType === 'month') {
-      return format(date, 'MMMM yyyy');
+      return formatInTimeZone(date, 'UTC', 'MMMM yyyy');
     }
     return '';
   };
@@ -330,7 +325,7 @@ const StudentAttendance = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="w-full overflow-x-auto rounded-md border">
+            <div className="w-full overflow-x-auto rounded-md border max-w-full">
               <table className="min-w-full border-collapse">
                 <thead>
                   <tr className="border-b border-border">
