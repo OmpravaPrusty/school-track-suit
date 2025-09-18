@@ -12,6 +12,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -25,6 +36,8 @@ import {
 import { Users, Plus, Edit, Trash2, Search } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Switch } from "@/components/ui/switch";
+import { formatNameToTitleCase } from "@/lib/utils";
 
 interface Student {
   id: string;
@@ -59,11 +72,19 @@ const StudentManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [statusChangeReason, setStatusChangeReason] = useState("");
   const [students, setStudents] = useState<Student[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalStudents, setTotalStudents] = useState(0);
+  const [selectedSchool, setSelectedSchool] = useState<string>('all');
+  const [selectedBatch, setSelectedBatch] = useState<string>('all');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const STUDENTS_PER_PAGE = 10;
   const [newStudent, setNewStudent] = useState({
     full_name: "",
     email: "",
@@ -86,13 +107,16 @@ const StudentManagement = () => {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    fetchData(currentPage);
+  }, [currentPage, selectedSchool, selectedBatch, sortOrder]);
 
-  const fetchData = async () => {
+  const fetchData = async (page: number) => {
+    setLoading(true);
     try {
-      // Fetch students with batch and school info
-      const { data: studentsData, error: studentsError } = await supabase
+      const from = page * STUDENTS_PER_PAGE;
+      const to = from + STUDENTS_PER_PAGE - 1;
+
+      let query = supabase
         .from('profiles')
         .select(`
           id,
@@ -111,7 +135,18 @@ const StudentManagement = () => {
               name
             )
           )
-        `);
+        `, { count: 'exact' });
+
+      if (selectedSchool !== 'all') {
+        query = query.eq('students.school_id', selectedSchool);
+      }
+      if (selectedBatch !== 'all') {
+        query = query.eq('students.batch_id', selectedBatch);
+      }
+
+      query = query.order('full_name', { ascending: sortOrder === 'asc' }).range(from, to);
+
+      const { data: studentsData, error: studentsError, count: studentCount } = await query;
 
       if (studentsError) throw studentsError;
 
@@ -132,6 +167,7 @@ const StudentManagement = () => {
       if (schoolsError) throw schoolsError;
 
       setStudents(studentsData || []);
+      setTotalStudents(studentCount || 0);
       setBatches(batchesData || []);
       setSchools(schoolsData || []);
     } catch (error) {
@@ -144,6 +180,46 @@ const StudentManagement = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleStatusChange = async () => {
+    if (!selectedStudent) return;
+    const newStatus = selectedStudent.status === 'active' ? 'inactive' : 'active';
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ status: newStatus, status_reason: statusChangeReason })
+        .eq('id', selectedStudent.id);
+
+      if (error) throw error;
+
+      setStudents(prevStudents =>
+        prevStudents.map(s =>
+          s.id === selectedStudent.id ? { ...s, status: newStatus } : s
+        )
+      );
+
+      toast({
+        title: "Status Updated",
+        description: `${selectedStudent.full_name}'s status has been updated to ${newStatus}.`,
+      });
+    } catch (error: any) {
+      console.error('Error updating status:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update status",
+        variant: "destructive",
+      });
+    } finally {
+      setIsStatusDialogOpen(false);
+      setStatusChangeReason("");
+      setSelectedStudent(null);
+    }
+  };
+
+  const openStatusDialog = (student: Student) => {
+    setSelectedStudent(student);
+    setIsStatusDialogOpen(true);
   };
 
   const filteredStudents = students.filter(student =>
@@ -327,10 +403,7 @@ const StudentManagement = () => {
         </div>
       </div>
 
-      <Card className="border-border/50">
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <CardTitle>Student Directory</CardTitle>
+      
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
               <div className="relative flex-1 sm:w-64">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -341,6 +414,31 @@ const StudentManagement = () => {
                   className="pl-10"
                 />
               </div>
+              <Select value={selectedSchool} onValueChange={setSelectedSchool}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by school" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Schools</SelectItem>
+                  {schools.map(school => (
+                    <SelectItem key={school.id} value={school.id}>{school.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={selectedBatch} onValueChange={setSelectedBatch}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by batch" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Batches</SelectItem>
+                  {batches.map(batch => (
+                    <SelectItem key={batch.id} value={batch.id}>{batch.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}>
+                Sort {sortOrder === 'asc' ? 'A-Z' : 'Z-A'}
+              </Button>
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
@@ -361,7 +459,7 @@ const StudentManagement = () => {
                       <Input
                         id="add-name"
                         value={newStudent.full_name}
-                        onChange={(e) => setNewStudent(prev => ({ ...prev, full_name: e.target.value }))}
+                        onChange={(e) => setNewStudent(prev => ({ ...prev, full_name: formatNameToTitleCase(e.target.value) }))}
                         placeholder="Enter full name"
                       />
                     </div>
@@ -441,6 +539,11 @@ const StudentManagement = () => {
                 </DialogContent>
               </Dialog>
             </div>
+          
+        <Card className="border-border/50">
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <CardTitle>Student Directory</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
@@ -460,18 +563,25 @@ const StudentManagement = () => {
               <TableBody>
                  {filteredStudents.map((student) => (
                    <TableRow key={student.id} className="hover:bg-muted/30">
-                     <TableCell className="font-medium">{student.full_name}</TableCell>
+                     <TableCell className="font-medium">{formatNameToTitleCase(student.full_name)}</TableCell>
                      <TableCell>{student.students?.student_id || '-'}</TableCell>
                      <TableCell>{student.email}</TableCell>
                      <TableCell>{student.students?.batches?.name || '-'}</TableCell>
                      <TableCell>{student.students?.schools?.name || '-'}</TableCell>
                      <TableCell>
-                       <Badge
-                         variant={student.status === "active" ? "default" : "secondary"}
-                         className={student.status === "active" ? "bg-success text-success-foreground" : ""}
-                       >
-                         {student.status}
-                       </Badge>
+                       <div className="flex flex-col items-center gap-1">
+                         <Switch
+                           checked={student.status === 'active'}
+                           onCheckedChange={() => openStatusDialog(student)}
+                           aria-label="Toggle student status"
+                         />
+                         <Badge
+                           variant={student.status === "active" ? "default" : "secondary"}
+                           className="text-xs capitalize"
+                         >
+                           {student.status}
+                         </Badge>
+                       </div>
                      </TableCell>
                      <TableCell>
                        <div className="flex items-center gap-2">
@@ -483,14 +593,29 @@ const StudentManagement = () => {
                          >
                            <Edit className="h-4 w-4" />
                          </Button>
-                         <Button
-                           variant="outline"
-                           size="sm"
-                           onClick={() => handleDeleteStudent(student.id)}
-                           className="hover:bg-destructive hover:text-destructive-foreground"
-                         >
-                           <Trash2 className="h-4 w-4" />
-                         </Button>
+                         <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="hover:bg-destructive hover:text-destructive-foreground"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete this student and all their associated data.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteStudent(student.id)}>Continue</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                         </AlertDialog>
                        </div>
                      </TableCell>
                    </TableRow>
@@ -506,6 +631,29 @@ const StudentManagement = () => {
             </div>
           )}
         </CardContent>
+        <div className="flex justify-between items-center p-4 border-t">
+          <span className="text-sm text-muted-foreground">
+            Page {currentPage + 1} of {Math.ceil(totalStudents / STUDENTS_PER_PAGE)}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+              disabled={currentPage === 0}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(totalStudents / STUDENTS_PER_PAGE) - 1))}
+              disabled={(currentPage + 1) * STUDENTS_PER_PAGE >= totalStudents}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       </Card>
 
       {/* Edit Student Dialog */}
@@ -524,7 +672,7 @@ const StudentManagement = () => {
                 <Input
                   id="edit-name"
                   value={selectedStudent.full_name}
-                  onChange={(e) => setSelectedStudent(prev => prev ? ({ ...prev, full_name: e.target.value }) : null)}
+                  onChange={(e) => setSelectedStudent(prev => prev ? ({ ...prev, full_name: formatNameToTitleCase(e.target.value) }) : null)}
                   placeholder="Enter full name"
                 />
               </div>
@@ -597,6 +745,32 @@ const StudentManagement = () => {
             <Button onClick={handleEditStudent} className="bg-primary text-primary-foreground">
               Update Student
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Status Change Dialog */}
+      <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Student Status</DialogTitle>
+            <DialogDescription>
+              You are changing the status for <span className="font-semibold">{selectedStudent?.full_name}</span>.
+              Please provide a reason for this change.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="status-reason">Reason for Status Change</Label>
+            <Input
+              id="status-reason"
+              value={statusChangeReason}
+              onChange={(e) => setStatusChangeReason(e.target.value)}
+              placeholder="e.g., Dropped out, Completed course, etc."
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsStatusDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleStatusChange}>Confirm Change</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -2,10 +2,10 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Calendar, Users, Clock, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import ThreeStateToggle from "@/components/ui/ThreeStateToggle";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -24,6 +24,7 @@ import {
 interface Student {
   id: string;
   full_name: string;
+  status: 'active' | 'inactive' | 'suspended';
   students: {
     student_id: string;
   };
@@ -42,7 +43,7 @@ const StudentAttendance = () => {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
-  const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent'>>({});
+  const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent' | 'not_applicable' | null>>({});
   const [isDirty, setIsDirty] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
@@ -104,7 +105,7 @@ const StudentAttendance = () => {
     try {
       const { data: studentsData, error: studentsError } = await supabase
         .from('profiles')
-        .select('id, full_name, students!inner(student_id)')
+        .select('id, full_name, status, students!inner(student_id)')
         .eq('students.batch_id', selectedBatch);
 
       if (studentsError) throw studentsError;
@@ -130,10 +131,10 @@ const StudentAttendance = () => {
 
       if (attendanceError) throw attendanceError;
 
-      const newAttendanceState: Record<string, 'present' | 'absent'> = {};
+      const newAttendanceState: Record<string, 'present' | 'absent' | 'not_applicable' | null> = {};
       attendanceData.forEach(record => {
         const key = `${record.student_id}|${record.attendance_date}`;
-        newAttendanceState[key] = record.status as 'present' | 'absent';
+        newAttendanceState[key] = record.status as 'present' | 'absent' | 'not_applicable' | null;
       });
       setAttendance(newAttendanceState);
       setIsDirty(false);
@@ -175,13 +176,9 @@ const StudentAttendance = () => {
 
   const dates = generateDates();
 
-  const handleAttendanceToggle = (studentId: string, date: string) => {
+  const handleAttendanceToggle = (studentId: string, date: string, value: 'present' | 'absent' | 'not_applicable') => {
     const key = `${studentId}|${date}`;
-    setAttendance(prev => {
-      const currentStatus = prev[key];
-      const newStatus = currentStatus === 'present' ? 'absent' : 'present';
-      return { ...prev, [key]: newStatus };
-    });
+    setAttendance(prev => ({ ...prev, [key]: value }));
     setIsDirty(true);
   };
 
@@ -201,7 +198,7 @@ const StudentAttendance = () => {
       for (const date of modifiedDates) {
         for (const student of allStudents) {
           const key = `${student.id}|${date}`;
-          const status = attendance[key] || 'absent';
+          const status = attendance[key] || 'not_applicable';
 
           upsertPromises.push(
             supabase.from('attendance').upsert(
@@ -385,6 +382,12 @@ const StudentAttendance = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="flex justify-end text-sm text-muted-foreground mb-2 space-x-4">
+              <span></span>
+              <span><span className="font-bold text-green-600">P:</span> Present</span>
+              <span><span className="font-bold text-red-600">A:</span> Absent</span>
+              <span><span className="font-bold text-gray-500">NM:</span> Not Marked / Holiday / Dropout</span>
+            </div>
             <div className="w-full overflow-x-auto rounded-md border max-h-[600px] overflow-y-auto">
               <table className="min-w-full border-collapse">
                 <thead>
@@ -416,23 +419,19 @@ const StudentAttendance = () => {
                       {dates.map((date) => {
                         const dateStr = formatDate(date);
                         const key = `${student.id}|${dateStr}`;
-                        const status = attendance[key] || 'absent';
-                        const isPresent = status === 'present';
+                        const status = attendance[key] === undefined ? 'not_applicable' : (attendance[key] || 'not_applicable');
                         const isFuture = isDateInFuture(date);
                         const isSunday = date.getDay() === 0;
+                        const isInactive = student.status === 'inactive';
                         
                          return (
-                           <td key={dateStr} className="p-3 text-center">
-                             <div className="flex flex-col items-center gap-2">
-                               <Switch
-                                 checked={isPresent}
-                                 onCheckedChange={() => handleAttendanceToggle(student.id, dateStr)}
-                                 disabled={isFuture || isSunday}
-                                 className="data-[state=checked]:bg-success"
+                           <td key={dateStr} className="p-3 text-center min-w-[100px]">
+                             <div className="flex justify-center">
+                               <ThreeStateToggle
+                                 value={status}
+                                 onChange={(value) => handleAttendanceToggle(student.id, dateStr, value)}
+                                 disabled={isFuture || isSunday || isInactive}
                                />
-                               <span className={`text-xs ${isPresent ? 'text-success' : 'text-muted-foreground'}`}>
-                                 {isFuture || isSunday ? '-' : (isPresent ? 'Present' : 'Absent')}
-                               </span>
                              </div>
                            </td>
                          );

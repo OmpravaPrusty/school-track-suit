@@ -11,7 +11,7 @@ BEGIN
         CREATE TYPE public.session_status AS ENUM ('scheduled', 'ongoing', 'completed', 'cancelled');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'attendance_status') THEN
-        CREATE TYPE public.attendance_status AS ENUM ('present', 'absent', 'late');
+        CREATE TYPE public.attendance_status AS ENUM ('present', 'absent', 'late', 'not_applicable');
     END IF;
 END$$;
 
@@ -23,6 +23,7 @@ CREATE TABLE public.profiles (
     phone TEXT,
     avatar_url TEXT,
     status public.user_status DEFAULT 'active',
+    status_reason TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -137,14 +138,19 @@ CREATE TABLE public.sessions (
 -- Create attendance table
 CREATE TABLE public.attendance (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    session_id UUID REFERENCES public.sessions(id) ON DELETE CASCADE,
+    attendance_date DATE NOT NULL,
     student_id UUID REFERENCES public.students(id) ON DELETE CASCADE,
+    sme_id UUID REFERENCES public.smes(id) ON DELETE CASCADE,
     status public.attendance_status NOT NULL,
-    check_in_time TIMESTAMPTZ,
     notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE (session_id, student_id)
+    CHECK ( (student_id IS NOT NULL AND sme_id IS NULL) OR (student_id IS NULL AND sme_id IS NOT NULL) )
 );
+
+-- Add unique constraints to attendance table
+CREATE UNIQUE INDEX ON public.attendance (student_id, attendance_date) WHERE student_id IS NOT NULL;
+CREATE UNIQUE INDEX ON public.attendance (sme_id, attendance_date) WHERE sme_id IS NOT NULL;
+
 
 -- Create notifications table
 CREATE TABLE public.notifications (

@@ -262,9 +262,6 @@ const ReportGeneration = () => {
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-4xl h-[90vh]">
-                  <DialogHeader>
-                    <DialogTitle>Report Preview</DialogTitle>
-                  </DialogHeader>
                   <div className="h-full">
                     <PDFViewer width="100%" height="100%" className="rounded-md">
                       <AttendancePDF data={reportData} />

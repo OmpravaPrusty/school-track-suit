@@ -106,14 +106,18 @@ const MyAttendance = ({ userId, userRole }: MyAttendanceProps) => {
                   absent: 'bg-destructive text-destructive-foreground',
                 }}
               />
-               <div className="flex justify-center gap-4 mt-4">
+               <div className="flex justify-center gap-4 mt-4 text-sm">
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-success" />
-                  <span>Present</span>
+                  <div className="w-3 h-3 rounded-full bg-success" />
+                  <span>P: Present</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-destructive" />
-                  <span>Absent</span>
+                  <div className="w-3 h-3 rounded-full bg-destructive" />
+                  <span>A: Absent</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gray-300" />
+                  <span>NM: Not Marked</span>
                 </div>
               </div>
             </div>

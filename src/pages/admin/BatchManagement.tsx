@@ -3,7 +3,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Trash2, Users } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -21,23 +40,31 @@ const BatchManagement = () => {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({ name: "" });
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalBatches, setTotalBatches] = useState(0);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const BATCHES_PER_PAGE = 10;
 
   useEffect(() => {
-    fetchBatches();
-  }, []);
+    fetchBatches(currentPage);
+  }, [currentPage, sortOrder]);
 
-  const fetchBatches = async () => {
+  const fetchBatches = async (page: number) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const from = page * BATCHES_PER_PAGE;
+      const to = from + BATCHES_PER_PAGE - 1;
+
+      const { data, error, count } = await supabase
         .from('batches')
         .select(`
           id,
           name,
           created_at,
           students!inner(count)
-        `)
-        .order('created_at', { ascending: false });
+        `, { count: 'exact' })
+        .order('name', { ascending: sortOrder === 'asc' })
+        .range(from, to);
 
       if (error) throw error;
 
@@ -49,6 +76,7 @@ const BatchManagement = () => {
       }));
 
       setBatches(formattedBatches);
+      setTotalBatches(count || 0);
     } catch (error: any) {
       toast({
         title: "Error fetching batches",
@@ -182,8 +210,15 @@ const BatchManagement = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Batch List</CardTitle>
-          <CardDescription>Manage your student batches</CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Batch List</CardTitle>
+              <CardDescription>Manage your student batches</CardDescription>
+            </div>
+            <Button variant="outline" onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}>
+              Sort by Name {sortOrder === 'asc' ? '(A-Z)' : '(Z-A)'}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -208,13 +243,28 @@ const BatchManagement = () => {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => handleDelete(batch.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This action cannot be undone. This will permanently delete this batch and all students associated with it.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDelete(batch.id)}>Continue</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -222,6 +272,29 @@ const BatchManagement = () => {
             </TableBody>
           </Table>
         </CardContent>
+        <div className="flex justify-between items-center p-4 border-t">
+          <span className="text-sm text-muted-foreground">
+            Page {currentPage + 1} of {Math.ceil(totalBatches / BATCHES_PER_PAGE)}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+              disabled={currentPage === 0}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(totalBatches / BATCHES_PER_PAGE) - 1))}
+              disabled={(currentPage + 1) * BATCHES_PER_PAGE >= totalBatches}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       </Card>
     </div>
   );

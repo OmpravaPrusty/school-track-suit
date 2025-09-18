@@ -120,7 +120,7 @@ const Auth = () => {
                   <div className="flex items-center justify-between">
                     <Label htmlFor="signin-password">Password</Label>
                     <Button variant="link" type="button" className="h-auto p-0 text-xs" asChild>
-                      <Link to="#" onClick={(e) => e.preventDefault()}>Forgot password?</Link>
+                      <Link to="/forgot-password">Forgot password?</Link>
                     </Button>
                   </div>
                   <Input

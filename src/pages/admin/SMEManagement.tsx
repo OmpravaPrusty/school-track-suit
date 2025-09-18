@@ -3,13 +3,41 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Edit, Trash2, Search, Users } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Switch } from "@/components/ui/switch";
+import { formatNameToTitleCase } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const subjects = ['English', 'Math', 'BIO', 'PHY', 'CHEM', 'AI', 'CS'];
 
@@ -36,7 +64,16 @@ const SMEManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSME, setEditingSME] = useState<SME | null>(null);
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
+  const [selectedSME, setSelectedSME] = useState<SME | null>(null);
+  const [statusChangeReason, setStatusChangeReason] = useState("");
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalSMEs, setTotalSMEs] = useState(0);
+  const [selectedBatch, setSelectedBatch] = useState<string>('all');
+  const [selectedSubject, setSelectedSubject] = useState<string>('all');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const SMES_PER_PAGE = 10;
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
@@ -49,18 +86,20 @@ const SMEManagement = () => {
   });
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    fetchData(currentPage);
+  }, [currentPage]);
 
   const generateRandomPassword = () => {
     return Math.random().toString(36).slice(-8);
   };
 
-  const fetchData = async () => {
+  const fetchData = async (page: number) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      
-      const { data: smesData, error: smesError } = await supabase
+      const from = page * SMES_PER_PAGE;
+      const to = from + SMES_PER_PAGE - 1;
+
+      const { data: smesData, error: smesError, count: smeCount } = await supabase
         .from('smes')
         .select(`
           id,
@@ -78,7 +117,8 @@ const SMEManagement = () => {
           sme_batches (
             batch_id
           )
-        `);
+        `, { count: 'exact' })
+        .range(from, to);
 
       if (smesError) throw smesError;
 
@@ -102,6 +142,7 @@ const SMEManagement = () => {
       })) || [];
 
       setSMEs(formattedSMEs);
+      setTotalSMEs(smeCount || 0);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({
@@ -229,11 +270,67 @@ const SMEManagement = () => {
     }
   };
 
-  const filteredSMEs = smes.filter(sme =>
-    sme.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    sme.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    sme.sme_subjects.some(s => s.subject.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const handleStatusChange = async () => {
+    if (!selectedSME) return;
+    const newStatus = selectedSME.status === 'active' ? 'inactive' : 'active';
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ status: newStatus, status_reason: statusChangeReason })
+        .eq('id', selectedSME.id);
+
+      if (error) throw error;
+
+      setSMEs(prevSMEs =>
+        prevSMEs.map(s =>
+          s.id === selectedSME.id ? { ...s, status: newStatus } : s
+        )
+      );
+
+      toast({
+        title: "Status Updated",
+        description: `${selectedSME.full_name}'s status has been updated to ${newStatus}.`,
+      });
+    } catch (error: any) {
+      console.error('Error updating status:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update status",
+        variant: "destructive",
+      });
+    } finally {
+      setIsStatusDialogOpen(false);
+      setStatusChangeReason("");
+      setSelectedSME(null);
+    }
+  };
+
+  const openStatusDialog = (sme: SME) => {
+    setSelectedSME(sme);
+    setIsStatusDialogOpen(true);
+  };
+
+  const filteredSMEs = smes
+    .filter(sme => {
+      const searchMatch = searchTerm === '' ||
+        sme.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        sme.email.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const batchMatch = selectedBatch === 'all' ||
+        sme.sme_batches.some(b => b.batch_id === selectedBatch);
+
+      const subjectMatch = selectedSubject === 'all' ||
+        sme.sme_subjects.some(s => s.subject === selectedSubject);
+
+      return searchMatch && batchMatch && subjectMatch;
+    })
+    .sort((a, b) => {
+      if (sortOrder === 'asc') {
+        return a.full_name.localeCompare(b.full_name);
+      } else {
+        return b.full_name.localeCompare(a.full_name);
+      }
+    });
 
   if (loading) {
     return (
@@ -255,15 +352,42 @@ const SMEManagement = () => {
         </div>
       </div>
 
-      <div className="flex justify-between items-center">
-        <div className="relative w-96">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search SMEs by name, email, or specialization..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+      <div className="flex justify-between items-center gap-2">
+        <div className="flex gap-2 flex-1">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search SMEs..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={selectedBatch} onValueChange={setSelectedBatch}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by batch" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Batches</SelectItem>
+              {batches.map(batch => (
+                <SelectItem key={batch.id} value={batch.id}>{batch.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by subject" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Subjects</SelectItem>
+              {subjects.map(subject => (
+                <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}>
+            Sort {sortOrder === 'asc' ? 'A-Z' : 'Z-A'}
+          </Button>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) resetForm(); else setIsDialogOpen(true); }}>
           <DialogTrigger asChild>
@@ -281,7 +405,7 @@ const SMEManagement = () => {
               <div className="grid grid-cols-2 gap-x-6 gap-y-4 py-4">
                 <div className="space-y-2">
                   <Label htmlFor="full_name">Full Name *</Label>
-                  <Input id="full_name" value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} placeholder="Enter full name" required />
+                  <Input id="full_name" value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: formatNameToTitleCase(e.target.value) })} placeholder="Enter full name" required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email *</Label>
@@ -377,7 +501,7 @@ const SMEManagement = () => {
             <TableBody>
               {filteredSMEs.map((sme) => (
                 <TableRow key={sme.id}>
-                  <TableCell className="font-medium">{sme.full_name}</TableCell>
+                  <TableCell className="font-medium">{formatNameToTitleCase(sme.full_name)}</TableCell>
                   <TableCell>{sme.email}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
@@ -394,18 +518,44 @@ const SMEManagement = () => {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={sme.status === "active" ? "default" : "secondary"}>
-                      {sme.status}
-                    </Badge>
+                    <div className="flex flex-col items-center gap-1">
+                      <Switch
+                        checked={sme.status === 'active'}
+                        onCheckedChange={() => openStatusDialog(sme)}
+                        aria-label="Toggle SME status"
+                      />
+                      <Badge
+                        variant={sme.status === "active" ? "default" : "secondary"}
+                        className="text-xs capitalize"
+                      >
+                        {sme.status}
+                      </Badge>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
                       <Button variant="outline" size="icon" onClick={() => handleEdit(sme)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="icon" onClick={() => handleDelete(sme.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" size="icon">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This action cannot be undone. This will permanently delete this SME and all their associated data.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDelete(sme.id)}>Continue</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -418,7 +568,56 @@ const SMEManagement = () => {
             </div>
           )}
         </CardContent>
+        <div className="flex justify-between items-center p-4 border-t">
+          <span className="text-sm text-muted-foreground">
+            Page {currentPage + 1} of {Math.ceil(totalSMEs / SMES_PER_PAGE)}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+              disabled={currentPage === 0}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(totalSMEs / SMES_PER_PAGE) - 1))}
+              disabled={(currentPage + 1) * SMES_PER_PAGE >= totalSMEs}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       </Card>
+
+      {/* Status Change Dialog */}
+      <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change SME Status</DialogTitle>
+            <DialogDescription>
+              You are changing the status for <span className="font-semibold">{selectedSME?.full_name}</span>.
+              Please provide a reason for this change.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="status-reason">Reason for Status Change</Label>
+            <Input
+              id="status-reason"
+              value={statusChangeReason}
+              onChange={(e) => setStatusChangeReason(e.target.value)}
+              placeholder="e.g., Left the organization, On sabbatical, etc."
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsStatusDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleStatusChange}>Confirm Change</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

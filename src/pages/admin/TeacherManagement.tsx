@@ -3,13 +3,33 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Edit, Trash2, Search } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { formatNameToTitleCase } from "@/lib/utils";
 
 interface Teacher {
   id: string;
@@ -35,6 +55,11 @@ const TeacherManagement = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalTeachers, setTotalTeachers] = useState(0);
+  const [selectedSchool, setSelectedSchool] = useState<string>('all');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const TEACHERS_PER_PAGE = 10;
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
@@ -46,19 +71,20 @@ const TeacherManagement = () => {
   });
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    fetchData(currentPage);
+  }, [currentPage, selectedSchool, sortOrder]);
 
   const generateRandomPassword = () => {
     return Math.random().toString(36).slice(-8);
   };
 
-  const fetchData = async () => {
+  const fetchData = async (page: number) => {
+    setLoading(true);
     try {
-      setLoading(true);
+      const from = page * TEACHERS_PER_PAGE;
+      const to = from + TEACHERS_PER_PAGE - 1;
       
-      // Fetch teachers with their profiles and school information
-      const { data: teachersData, error: teachersError } = await supabase
+      let query = supabase
         .from('teachers')
         .select(`
           id,
@@ -75,7 +101,15 @@ const TeacherManagement = () => {
           schools (
             name
           )
-        `);
+        `, { count: 'exact' });
+
+      if (selectedSchool !== 'all') {
+        query = query.eq('school_id', selectedSchool);
+      }
+
+      query = query.order('profiles(full_name)', { ascending: sortOrder === 'asc' }).range(from, to);
+
+      const { data: teachersData, error: teachersError, count: teacherCount } = await query;
 
       if (teachersError) throw teachersError;
 
@@ -100,6 +134,7 @@ const TeacherManagement = () => {
       })) || [];
 
       setTeachers(formattedTeachers);
+      setTotalTeachers(teacherCount || 0);
       setSchools(schoolsData || []);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -309,7 +344,7 @@ const TeacherManagement = () => {
                   <Input
                     id="full_name"
                     value={formData.full_name}
-                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, full_name: formatNameToTitleCase(e.target.value) })}
                     placeholder="Enter full name"
                     required
                   />
@@ -401,7 +436,7 @@ const TeacherManagement = () => {
         <CardHeader>
           <CardTitle>Teachers</CardTitle>
           <CardDescription>Manage your teaching staff</CardDescription>
-          <div className="flex gap-4">
+          <div className="flex gap-2">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -411,6 +446,20 @@ const TeacherManagement = () => {
                 className="pl-10"
               />
             </div>
+            <Select value={selectedSchool} onValueChange={setSelectedSchool}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by school" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Schools</SelectItem>
+                {schools.map(school => (
+                  <SelectItem key={school.id} value={school.id}>{school.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}>
+              Sort {sortOrder === 'asc' ? 'A-Z' : 'Z-A'}
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -430,7 +479,7 @@ const TeacherManagement = () => {
             <TableBody>
               {filteredTeachers.map((teacher) => (
                 <TableRow key={teacher.id}>
-                  <TableCell className="font-medium">{teacher.full_name}</TableCell>
+                  <TableCell className="font-medium">{formatNameToTitleCase(teacher.full_name)}</TableCell>
                   <TableCell>{teacher.email}</TableCell>
                   <TableCell>{teacher.phone}</TableCell>
                   <TableCell>{teacher.specialization}</TableCell>
@@ -450,13 +499,28 @@ const TeacherManagement = () => {
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => handleDelete(teacher.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This action cannot be undone. This will permanently delete this teacher and all their associated data.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDelete(teacher.id)}>Continue</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -469,6 +533,29 @@ const TeacherManagement = () => {
             </div>
           )}
         </CardContent>
+        <div className="flex justify-between items-center p-4 border-t">
+          <span className="text-sm text-muted-foreground">
+            Page {currentPage + 1} of {Math.ceil(totalTeachers / TEACHERS_PER_PAGE)}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+              disabled={currentPage === 0}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(totalTeachers / TEACHERS_PER_PAGE) - 1))}
+              disabled={(currentPage + 1) * TEACHERS_PER_PAGE >= totalTeachers}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       </Card>
     </div>
   );

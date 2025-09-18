@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Calendar, GraduationCap, Clock, ArrowLeft, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import ThreeStateToggle from "@/components/ui/ThreeStateToggle";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -26,6 +26,7 @@ interface SME {
   name: string;
   department: string;
   employee_id: string;
+  status: 'active' | 'inactive' | 'suspended';
 }
 
 const SMEAttendance = () => {
@@ -35,7 +36,7 @@ const SMEAttendance = () => {
   const [referenceDate, setReferenceDate] = useState(new Date());
   const [smeList, setSmeList] = useState<SME[]>([]);
   const [dates, setDates] = useState<Date[]>([]);
-  const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent'>>({});
+  const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent' | 'not_applicable' | null>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -113,7 +114,8 @@ const SMEAttendance = () => {
           employee_id,
           department,
           profile:profiles (
-            full_name
+            full_name,
+            status
           )
         `);
 
@@ -130,6 +132,7 @@ const SMEAttendance = () => {
           name: sme.profile?.full_name || 'N/A',
           department: sme.department,
           employee_id: sme.employee_id,
+          status: sme.profile?.status,
         }));
         setSmeList(formattedSMEs);
       }
@@ -162,11 +165,11 @@ const SMEAttendance = () => {
       return;
     }
 
-    const newAttendance: Record<string, 'present' | 'absent'> = {};
+    const newAttendance: Record<string, 'present' | 'absent' | 'not_applicable' | null> = {};
     data.forEach(record => {
       if (record.sme_id) {
         const key = `${record.sme_id}|${record.attendance_date}`;
-        newAttendance[key] = record.status as 'present' | 'absent';
+        newAttendance[key] = record.status as 'present' | 'absent' | 'not_applicable' | null;
       }
     });
     setAttendance(newAttendance);
@@ -183,14 +186,10 @@ const SMEAttendance = () => {
     }
   }, [viewType, smeList, referenceDate, generateDates, fetchAttendance]);
 
-  const handleAttendanceToggle = (smeId: string, date: Date) => {
+  const handleAttendanceToggle = (smeId: string, date: Date, value: 'present' | 'absent' | 'not_applicable') => {
     const dateStr = formatDateForSupabase(date);
     const key = `${smeId}|${dateStr}`;
-    setAttendance(prev => {
-      const currentStatus = prev[key];
-      const newStatus = currentStatus === 'present' ? 'absent' : 'present';
-      return { ...prev, [key]: newStatus };
-    });
+    setAttendance(prev => ({ ...prev, [key]: value }));
     setIsDirty(true);
   };
 
@@ -211,7 +210,7 @@ const SMEAttendance = () => {
     for (const date of modifiedDates) {
       for (const sme of allSMEs) {
         const key = `${sme.id}|${date}`;
-        const status = attendance[key] || 'absent';
+          const status = attendance[key] || 'not_applicable';
         upsertPromises.push(
           supabase.from('attendance').upsert(
             { sme_id: sme.id, attendance_date: date, status: status, student_id: null },
@@ -371,6 +370,12 @@ const SMEAttendance = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="flex justify-end text-sm text-muted-foreground mb-2 space-x-4">
+              <span>**Key:**</span>
+              <span><span className="font-bold text-green-600">P:</span> Present</span>
+              <span><span className="font-bold text-red-600">A:</span> Absent</span>
+              <span><span className="font-bold text-gray-500">N/A:</span> Not Marked / Holiday</span>
+            </div>
             {isLoading ? (
               <div className="flex justify-center items-center h-40">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -407,24 +412,18 @@ const SMEAttendance = () => {
                         {dates.map((date) => {
                           const dateStr = formatDateForSupabase(date);
                           const key = `${sme.id}|${dateStr}`;
-                          const status = attendance[key] || 'absent';
-                          const isPresent = status === 'present';
+                          const status = attendance[key] === undefined ? 'not_applicable' : (attendance[key] || 'not_applicable');
                           const isFuture = isDateInFuture(date);
                           const isSunday = date.getDay() === 0;
+                          const isInactive = sme.status === 'inactive';
 
                           return (
                             <td key={key} className="p-3 text-center">
-                              <div className="flex flex-col items-center gap-2">
-                                <Switch
-                                  checked={isPresent}
-                                  onCheckedChange={() => handleAttendanceToggle(sme.id, date)}
-                                  disabled={isFuture || isSunday}
-                                  className="data-[state=checked]:bg-success"
-                                />
-                                <span className={`text-xs ${isPresent ? 'text-success' : 'text-muted-foreground'}`}>
-                                  {isFuture || isSunday ? '-' : (isPresent ? 'Present' : 'Absent')}
-                                </span>
-                              </div>
+                              <ThreeStateToggle
+                                value={status}
+                                onChange={(value) => handleAttendanceToggle(sme.id, date, value)}
+                                disabled={isFuture || isSunday || isInactive}
+                              />
                             </td>
                           );
                         })}

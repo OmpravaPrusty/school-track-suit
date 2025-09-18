@@ -13,7 +13,9 @@ const styles = StyleSheet.create({
   page: {
     flexDirection: 'column',
     backgroundColor: '#FFFFFF',
-    padding: 30,
+    paddingTop: 15,
+    paddingBottom: 30,
+    paddingHorizontal: 30,
     fontFamily: 'Helvetica',
   },
   header: {
