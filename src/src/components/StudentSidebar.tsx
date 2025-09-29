@@ -1,4 +1,11 @@
-import { Home, CalendarCheck, Users, BookOpen, Bell, ClipboardCheck } from "lucide-react";
+import {
+  Home,
+  CalendarCheck,
+  Users,
+  BookOpen,
+  Bell,
+  ClipboardCheck,
+} from "lucide-react";
 import { NavLink } from "react-router-dom";
 import {
   Sidebar,
@@ -23,26 +30,26 @@ const navigationItems = [
     url: "/student/attendance",
     icon: CalendarCheck,
   },
-  // {
-  //   title: "Sessions",
-  //   url: "/student/sessions",
-  //   icon: Users,
-  // },
-  // {
-  //   title: "Courses",
-  //   url: "/student/courses",
-  //   icon: BookOpen,
-  // },
-  // {
-  //   title: "Marks",
-  //   url: "/student/marks",
-  //   icon: ClipboardCheck,
-  // },
-  // {
-  //   title: "Notifications",
-  //   url: "/student/notifications",
-  //   icon: Bell,
-  // },
+  {
+    title: "Sessions",
+    url: "/student/sessions",
+    icon: Users,
+  },
+  {
+    title: "Courses",
+    url: "/student/courses",
+    icon: BookOpen,
+  },
+  {
+    title: "Marks",
+    url: "/student/marks",
+    icon: ClipboardCheck,
+  },
+  {
+    title: "Notifications",
+    url: "/student/notifications",
+    icon: Bell,
+  },
 ];
 
 export function StudentSidebar() {
@@ -51,7 +58,9 @@ export function StudentSidebar() {
 
   return (
     <Sidebar
-      className={`${collapsed ? "w-16" : "w-64"} transition-all duration-300 border-r border-sidebar-border bg-sidebar`}
+      className={`${
+        collapsed ? "w-16" : "w-64"
+      } transition-all duration-300 border-r border-sidebar-border bg-sidebar`}
     >
       <SidebarContent className="p-0">
         <div className="p-6 border-b border-sidebar-border">
@@ -61,8 +70,12 @@ export function StudentSidebar() {
             </div>
             {!collapsed && (
               <div>
-                <h2 className="font-semibold text-sidebar-foreground">Student Portal</h2>
-                <p className="text-xs text-sidebar-foreground/70">Learning Management</p>
+                <h2 className="font-semibold text-sidebar-foreground">
+                  Student Portal
+                </h2>
+                <p className="text-xs text-sidebar-foreground/70">
+                  Learning Management
+                </p>
               </div>
             )}
           </div>
